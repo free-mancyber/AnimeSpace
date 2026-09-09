@@ -1,12 +1,27 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>AnimeSpace — Аниме</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#080a10;color:#fff;font-family:Arial,sans-serif}.nav{height:68px;border-bottom:1px solid #202534;display:flex;align-items:center;gap:28px;padding:0 6%;background:#0b0e16}.logo{font-size:23px;font-weight:800;color:#8b7cff}.nav a{color:#aeb5c5;text-decoration:none}.search{margin-left:auto;background:#141925;border:1px solid #292f40;color:#fff;border-radius:10px;padding:11px 15px;width:220px}.hero{padding:70px 6% 45px;max-width:1100px}.hero small{color:#8b7cff;font-weight:700}.hero h1{font-size:48px;margin:12px 0}.hero p{color:#aeb5c5;font-size:18px;max-width:650px;line-height:1.6}.btn{display:inline-block;margin-top:12px;padding:13px 20px;background:#7567ff;color:#fff;text-decoration:none;border-radius:10px;font-weight:700}.section{padding:15px 6%}.section h2{font-size:25px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px}.anime{background:#111520;border:1px solid #242a39;border-radius:14px;overflow:hidden}.poster{height:240px;background:linear-gradient(145deg,#262d44,#171a27);display:grid;place-items:center;font-size:42px;font-weight:800;color:#8b7cff}.anime div:last-child{padding:14px}.anime b{display:block;margin-bottom:6px}.anime span{color:#8992a6;font-size:13px}@media(max-width:600px){.nav{padding:0 18px;gap:15px}.nav a{display:none}.search{width:140px}.hero{padding:45px 18px}.hero h1{font-size:36px}.section{padding:15px 18px}.grid{grid-template-columns:repeat(2,1fr)}.poster{height:190px}}
-</style></head><body>
-<nav class="nav"><div class="logo">AnimeSpace</div><a href="#">Главная</a><a href="#catalog">Каталог</a><a href="#favorites">Избранное</a><input class="search" placeholder="Поиск аниме..."></nav>
-<header class="hero"><small>ANIMESPACE</small><h1>Смотри. Находи. Люби аниме.</h1><p>Современная платформа для поиска любимых тайтлов, отслеживания просмотра и создания собственной коллекции.</p><a class="btn" href="#catalog">Открыть каталог</a></header>
-<section class="section" id="catalog"><h2>Популярное</h2><div class="grid"><article class="anime"><div class="poster">A</div><div><b>Атака титанов</b><span>Экшен · Фэнтези</span></div></article><article class="anime"><div class="poster">N</div><div><b>Наруто</b><span>Приключения · Сёнен</span></div></article><article class="anime"><div class="poster">J</div><div><b>Дзюдзюцу Кайсен</b><span>Экшен · Сверхъестественное</span></div></article><article class="anime"><div class="poster">O</div><div><b>Ван-Пис</b><span>Приключения · Комедия</span></div></article></div></section>
-<section class="section" id="favorites"><h2>Твоя коллекция</h2><p style="color:#8992a6">Войди в аккаунт, чтобы сохранять аниме и продолжать просмотр.</p></section>
-</body></html>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AnimeSpace</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#090b12;color:#f5f7fb;font-family:Arial,sans-serif;min-height:100vh;display:grid;place-items:center}.card{width:min(92%,430px);padding:32px;background:#121622;border:1px solid #252b3a;border-radius:20px;box-shadow:0 20px 60px #0008}.logo{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;background:#6d5dfc;font-size:25px;font-weight:800;margin-bottom:22px}.tag{color:#9aa4b8;font-size:14px;margin:0 0 8px}.title{font-size:32px;margin:0 0 8px}.sub{color:#9aa4b8;margin:0 0 28px}label{display:block;font-size:14px;margin:16px 0 7px}input{width:100%;padding:13px 14px;border-radius:11px;border:1px solid #303749;background:#0d111b;color:#fff;outline:none}input:focus{border-color:#6d5dfc}.btn{width:100%;margin-top:24px;padding:14px;border:0;border-radius:11px;background:#6d5dfc;color:white;font-weight:700;font-size:15px;cursor:pointer}.login{text-align:center;color:#9aa4b8;margin:22px 0 0;font-size:14px}.login a{color:#9b91ff;text-decoration:none}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="logo">A</div>
+    <p class="tag">AnimeSpace</p>
+    <h1 class="title">Создать аккаунт</h1>
+    <p class="sub">Присоединяйся к AnimeSpace</p>
+    <form onsubmit="event.preventDefault(); alert('Демо: регистрация будет подключена позже.');">
+      <label for="name">Никнейм</label><input id="name" placeholder="Твой никнейм" required>
+      <label for="email">Email</label><input id="email" type="email" placeholder="you@example.com" required>
+      <label for="password">Пароль</label><input id="password" type="password" placeholder="••••••••" required>
+      <label for="password2">Повторите пароль</label><input id="password2" type="password" placeholder="••••••••" required>
+      <button class="btn" type="submit">Создать аккаунт</button>
+    </form>
+    <p class="login">Уже есть аккаунт? <a href="#">Войти</a></p>
+  </main>
+</body>
+</html>
