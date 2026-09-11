@@ -14,11 +14,18 @@ const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 document.getElementById('email').textContent=localStorage.getItem('animeSpacePendingEmail')||'вашу почту';
 document.getElementById('back').onclick=()=>location.href='register.html';
 async function check(){
- const {data}=await supabaseClient.auth.getSession();
- if(data.session){
+ const {data:{session}}=await supabaseClient.auth.getSession();
+ if(session){
    localStorage.removeItem('animeSpacePendingEmail');
    localStorage.removeItem('animeSpacePendingNickname');
-   location.href='index.html';
+   location.replace('index.html');
+   return;
+ }
+ const {data:{user}}=await supabaseClient.auth.getUser();
+ if(user && user.email_confirmed_at){
+   localStorage.removeItem('animeSpacePendingEmail');
+   localStorage.removeItem('animeSpacePendingNickname');
+   location.replace('index.html');
  }
 }
 check();
