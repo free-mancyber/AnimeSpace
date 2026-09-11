@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta name="theme-color" content="#080910"><title>AnimeSpace — Подтверждение почты</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,Arial,sans-serif;color:#fff}body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,rgba(5,6,14,.82),rgba(18,8,31,.72)),radial-gradient(circle at 80% 20%,#6941c655,transparent 35%),#080910}.wrap{width:min(100%,620px)}.card{padding:42px 38px;text-align:center;border:1px solid rgba(255,255,255,.18);border-radius:38px;background:linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.035));backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);box-shadow:0 25px 80px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.14)}.logo{width:100%;max-width:560px;height:150px;object-fit:contain}.spinner{width:46px;height:46px;margin:18px auto;border:4px solid rgba(255,255,255,.12);border-top-color:#8b5cf6;border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}h1{font-size:30px;margin:8px 0 12px}.text{color:#9da3b5;line-height:1.6;font-size:15px}.email{color:#fff;font-weight:700;word-break:break-word}.hint{color:#777e91;font-size:13px;margin-top:20px}button{margin-top:18px;padding:12px 18px;border:0;border-radius:16px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer}button:hover{background:rgba(255,255,255,.13)}
+</style></head>
+<body><main class="wrap"><section class="card"><img class="logo" src="image.png" alt="AnimeSpace"><div class="spinner"></div><h1>Проверьте почту</h1><p class="text">Мы отправили письмо с подтверждением на<br><span class="email" id="email">вашу почту</span></p><p class="hint">Откройте письмо и нажмите кнопку подтверждения.<br>После подтверждения вы автоматически перейдёте в AnimeSpace.</p><button id="back">Вернуться к регистрации</button></section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://vbxjvwssjafcfbmqrqow.supabase.co';
+const SUPABASE_KEY='sb_publishable__5mPBElGBo1GFn7Yd0n4Ng_1i28p6aE';
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+document.getElementById('email').textContent=localStorage.getItem('animeSpacePendingEmail')||'вашу почту';
+document.getElementById('back').onclick=()=>location.href='register.html';
+async function check(){
+ const {data}=await supabaseClient.auth.getSession();
+ if(data.session){
+   localStorage.removeItem('animeSpacePendingEmail');
+   localStorage.removeItem('animeSpacePendingNickname');
+   location.href='index.html';
+ }
+}
+check();
+setInterval(check,1500);
+window.addEventListener('storage',check);
+</script></body></html>
