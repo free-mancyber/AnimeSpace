@@ -72,4 +72,28 @@
   supabaseClient.auth.onAuthStateChange(()=>setTimeout(loadProfileWithAvatar,0));
   loadProfileWithAvatar();
 })();
-</script></body></html>
+</script>
+
+<!-- Переход на страницу выбранного аниме -->
+<script>
+document.addEventListener('click',function(e){
+  const card=e.target.closest('.anime-card,.top-card');
+
+  if(!card)return;
+
+  const img=card.querySelector('img');
+  const title=card.querySelector('.title,.top-name');
+  const rating=card.querySelector('.rating,.top-rating');
+
+  const anime={
+    title:title?title.textContent.trim():'Аниме',
+    rating:rating?rating.textContent.replace('★','').trim():'—',
+    image:img?img.src:''
+  };
+
+  localStorage.setItem('selectedAnime',JSON.stringify(anime));
+  window.location.href='anime-details.html';
+});
+</script>
+
+</body></html>
