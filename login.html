@@ -3,19 +3,51 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#080910"><title>AnimeSpace — Вход</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,Arial,sans-serif;color:#fff}body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,rgba(5,6,14,.82),rgba(18,8,31,.72)),radial-gradient(circle at 80% 20%,#6941c655,transparent 35%),#080910;overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(120deg,transparent 0 45%,rgba(255,255,255,.025) 50%,transparent 55%)}.wrap{width:min(100%,620px);position:relative;z-index:1}.card{position:relative;padding:34px 38px;background:linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.035));border:1px solid rgba(255,255,255,.18);border-radius:38px;box-shadow:0 25px 80px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.14),0 0 35px rgba(139,92,246,.10);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);overflow:hidden}.card:before{content:"";position:absolute;left:8%;right:8%;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);opacity:.7}.brand{text-align:center;margin-bottom:18px}.logo{width:560px;height:145px;max-width:100%;display:block;margin:auto;object-fit:contain;border-radius:0;background:transparent;box-shadow:none;filter:none}h1{text-align:center;font-size:34px;margin:0 0 26px;line-height:1.1;letter-spacing:-1px}form{display:grid}label{display:block;margin:0 0 8px;font-size:14px;color:#bbb5cf}.field{margin-bottom:17px}input{width:100%;padding:16px 18px;border-radius:22px;border:1px solid rgba(255,255,255,.13);background:rgba(7,8,17,.48);color:#fff;font-size:16px;outline:none;transition:.2s;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}input:focus{border-color:#9b6cff;box-shadow:0 0 0 4px rgba(155,108,255,.12),inset 0 1px 0 rgba(255,255,255,.06)}input::placeholder{color:#62697b}.btn{width:100%;padding:16px;border:0;border-radius:22px;background:linear-gradient(135deg,#8d5cff,#c05cff);color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:5px;box-shadow:0 10px 30px rgba(139,92,246,.22);transition:.2s}.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}.login{text-align:center;margin-top:20px;color:#aaa4bb;font-size:14px}.login a{color:#b889ff;text-decoration:none}.login a:hover{text-decoration:underline}@media(max-width:520px){.card{padding:27px 22px;border-radius:30px}.logo{height:120px}h1{font-size:29px}}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,Arial,sans-serif;color:#fff}body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,rgba(5,6,14,.82),rgba(18,8,31,.72)),radial-gradient(circle at 80% 20%,#6941c655,transparent 35%),#080910;overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(120deg,transparent 0 45%,rgba(255,255,255,.025) 50%,transparent 55%)}.wrap{width:min(100%,620px);position:relative;z-index:1}.card{position:relative;padding:34px 38px;background:linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.035));border:1px solid rgba(255,255,255,.18);border-radius:38px;box-shadow:0 25px 80px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.14),0 0 35px rgba(139,92,246,.10);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);overflow:hidden}.card:before{content:"";position:absolute;left:8%;right:8%;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);opacity:.7}.brand{text-align:center;margin-bottom:18px}.logo{width:560px;height:145px;max-width:100%;display:block;margin:auto;object-fit:contain;border-radius:0;background:transparent;box-shadow:none;filter:none}h1{text-align:center;font-size:34px;margin:0 0 26px;line-height:1.1;letter-spacing:-1px}form{display:grid}label{display:block;margin:0 0 8px;font-size:14px;color:#bbb5cf}.field{margin-bottom:17px}input{width:100%;padding:16px 18px;border-radius:22px;border:1px solid rgba(255,255,255,.13);background:rgba(7,8,17,.48);color:#fff;font-size:16px;outline:none;transition:.2s;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}input:focus{border-color:#9b6cff;box-shadow:0 0 0 4px rgba(155,108,255,.12),inset 0 1px 0 rgba(255,255,255,.06)}input::placeholder{color:#62697b}.btn{width:100%;padding:16px;border:0;border-radius:22px;background:linear-gradient(135deg,#8d5cff,#c05cff);color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:5px;box-shadow:0 10px 30px rgba(139,92,246,.22);transition:.2s}.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}.btn:disabled{opacity:.65;cursor:wait;transform:none}.login{text-align:center;margin-top:20px;color:#aaa4bb;font-size:14px}.login a{color:#b889ff;text-decoration:none}.login a:hover{text-decoration:underline}.error{text-align:center;color:#ff8d9d;font-size:14px;min-height:20px;margin:12px 0 0}@media(max-width:520px){.card{padding:27px 22px;border-radius:30px}.logo{height:120px}h1{font-size:29px}}
 </style>
 </head>
 <body>
 <div class="wrap"><div class="card">
 <div class="brand"><img class="logo" src="image.png" alt="AnimeSpace"></div>
 <h1>Войти</h1>
-<form onsubmit="event.preventDefault();alert('Демо: авторизация будет подключена позже.');">
-<div class="field"><label for="login">Email или никнейм</label><input id="login" type="text" placeholder="Введите email или никнейм" autocomplete="off" required></div>
-<div class="field"><label for="password">Пароль</label><input id="password" type="password" placeholder="Введите пароль" autocomplete="new-password" required></div>
-<button class="btn" type="submit">Войти</button>
+<form id="loginForm">
+<div class="field"><label for="login">Email</label><input id="login" type="email" placeholder="Введите email" autocomplete="email" required></div>
+<div class="field"><label for="password">Пароль</label><input id="password" type="password" placeholder="Введите пароль" autocomplete="current-password" required></div>
+<button class="btn" id="submitBtn" type="submit">Войти</button>
+<div class="error" id="error"></div>
 </form>
 <p class="login">Нет аккаунта? <a href="register.html">Создать аккаунт</a></p>
 </div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://vbxjvwssjafcfbmqrqow.supabase.co';
+const SUPABASE_KEY='sb_publishable__5mPBElGBo1GFn7Yd0n4Ng_1i28p6aE';
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const form=document.getElementById('loginForm');
+const error=document.getElementById('error');
+const btn=document.getElementById('submitBtn');
+form.addEventListener('submit',async e=>{
+ e.preventDefault();
+ error.textContent='';
+ const email=document.getElementById('login').value.trim();
+ const password=document.getElementById('password').value;
+ btn.disabled=true;
+ btn.textContent='Входим…';
+ const {data,error:signInError}=await supabaseClient.auth.signInWithPassword({email,password});
+ if(signInError){
+   if(signInError.message.toLowerCase().includes('not confirmed')){
+     error.textContent='Сначала подтверди Email.';
+   }else{
+     error.textContent='Неверный Email или пароль.';
+   }
+   btn.disabled=false;
+   btn.textContent='Войти';
+   return;
+ }
+ if(data.session){
+   window.location.replace('index.html');
+ }
+});
+</script>
 </body>
 </html>
