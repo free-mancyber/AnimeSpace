@@ -1,9 +1,8 @@
-const ANIME_CACHE_KEY='animeSpaceApiCache:v2';
+const ANIME_CACHE_KEY='animeSpaceApiCache:v3';
 const ANIME_CACHE_TTL=24*60*60*1000;
 const ANILIST_API='https://graphql.anilist.co';
 const SUPABASE_URL='https://vbxjvwssjafcfbmqrqow.supabase.co';
 const SUPABASE_KEY='sb_publishable__5mPBElGBo1GFn7Yd0n4Ng_1i28p6aE';
-
 function getAnimeCache(){try{return JSON.parse(localStorage.getItem(ANIME_CACHE_KEY)||'{}')}catch{return {}}}
 function getCachedAnime(key){const x=getAnimeCache()[key];return x&&Date.now()-x.savedAt<ANIME_CACHE_TTL?x.data:null}
 function cacheAnime(key,data){if(!data)return;try{const c=getAnimeCache();c[key]={savedAt:Date.now(),data};localStorage.setItem(ANIME_CACHE_KEY,JSON.stringify(c))}catch{}}
@@ -11,66 +10,19 @@ function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&l
 function animeStatusKey(a){return String(a?.title||'').trim().toLowerCase()+'|'+String(a?.image||'').trim()}
 function statusStorageKey(id){return 'animeSpaceStatuses:'+id}
 function getStatuses(id){try{return JSON.parse(localStorage.getItem(statusStorageKey(id))||'{}')}catch{return {}}}
-
-function normalizeAnime(a){
- if(!a)return null;
- const image=a.coverImage?.extraLarge||a.coverImage?.large||a.coverImage?.medium||a.image?.original||a.image?.preview||a.image||a.poster?.originalUrl||'';
- return {id:a.id,title:a.title?.userPreferred||a.title?.russian||a.title?.romaji||a.russian||a.name||a.title||'Без названия',image,rating:a.averageScore?Number(a.averageScore/10).toFixed(1):(a.score?Number(a.score/10).toFixed(1):(a.rating??'—')),year:a.startDate?.year||a.year||null,episodes:a.episodes||0,status:a.status||'',duration:a.duration||0,genres:(a.genres||[]).map(g=>g.russian||g.name||g).filter(Boolean),description:a.description||''}
-}
-
-async function aniList(query,variables={}){
- const r=await fetch(ANILIST_API,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query,variables}),cache:'no-store'});
- if(!r.ok)throw new Error('AniList API: '+r.status);
- const json=await r.json();
- if(json.errors?.length)throw new Error(json.errors[0].message||'AniList API error');
- return json.data;
-}
-const MEDIA_FIELDS=`id title { romaji english native userPreferred } coverImage { extraLarge large medium } averageScore startDate { year } episodes status duration genres description`;
-
-async function shikimori(path,params={}){
- let type=path==='/calendar'?'schedule':path.startsWith('/animes/')?'details':params.search?'search':params.order==='popularity'?'popular':params.order==='aired_on'?'new':'top';
- if(type==='details'){
-  const data=await aniList(`query($id:Int){Media(id:$id,type:ANIME){${MEDIA_FIELDS}}}`,{id:Number(path.split('/').pop())});
-  return data.Media||null;
- }
- if(type==='schedule'){
-  const now=Math.floor(Date.now()/1000);
-  const data=await aniList(`query($from:Int,$to:Int){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$from,airingAt_lesser:$to){episode airingAt media{${MEDIA_FIELDS}}}}}`,{from:now-86400,to:now+7*86400});
-  return (data.Page.airingSchedules||[]).map(x=>({anime:x.media,next_episode:x.episode,next_episode_at:new Date(x.airingAt*1000).toISOString()}));
- }
- const perPage=Math.min(Number(params.limit)||20,50),page=Number(params.page)||1;
- let sort=type==='top'||type==='search'?'SCORE_DESC':type==='new'?'START_DATE_DESC':'POPULARITY_DESC';
- const data=await aniList(`query($page:Int,$perPage:Int,$search:String,$sort:[MediaSort]){Page(page:$page,perPage:$perPage){media(type:ANIME,search:$search,sort:$sort,isAdult:false){${MEDIA_FIELDS}}}}`,{page,perPage,search:params.search||null,sort:[sort]});
- return data.Page.media||[];
-}
-
+function russianTitle(a){const syn=(a.synonyms||[]).find(x=>/[А-Яа-яЁё]/.test(x));return syn||a.title?.userPreferred||a.title?.english||a.title?.romaji||a.title?.native||'Без названия'}
+function normalizeAnime(a){if(!a)return null;const image=a.coverImage?.extraLarge||a.coverImage?.large||a.coverImage?.medium||a.image?.original||a.image?.preview||a.image||a.poster?.originalUrl||'';return {id:a.id,title:russianTitle(a),image,rating:a.averageScore?Number(a.averageScore/10).toFixed(1):(a.score?Number(a.score/10).toFixed(1):(a.rating??'—')),year:a.startDate?.year||a.year||null,episodes:a.episodes||0,status:a.status||'',duration:a.duration||0,genres:(a.genres||[]).map(g=>g.russian||g.name||g).filter(Boolean),description:a.description||''}}
+async function aniList(query,variables={}){const r=await fetch(ANILIST_API,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query,variables}),cache:'no-store'});if(!r.ok)throw new Error('AniList API: '+r.status);const json=await r.json();if(json.errors?.length)throw new Error(json.errors[0].message||'AniList API error');return json.data}
+const MEDIA_FIELDS=`id title { romaji english native userPreferred } synonyms coverImage { extraLarge large medium } averageScore startDate { year } episodes status duration genres description`;
+async function shikimori(path,params={}){let type=path==='/calendar'?'schedule':path.startsWith('/animes/')?'details':params.search?'search':params.order==='popularity'?'popular':params.order==='aired_on'?'new':'top';if(type==='details'){const data=await aniList(`query($id:Int){Media(id:$id,type:ANIME){${MEDIA_FIELDS}}}`,{id:Number(path.split('/').pop())});return data.Media||null}if(type==='schedule'){const now=Math.floor(Date.now()/1000);const data=await aniList(`query($from:Int,$to:Int){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$from,airingAt_lesser:$to){episode airingAt media{${MEDIA_FIELDS}}}}}`,{from:now-86400,to:now+7*86400});return(data.Page.airingSchedules||[]).map(x=>({anime:x.media,next_episode:x.episode,next_episode_at:new Date(x.airingAt*1000).toISOString()}))}const perPage=Math.min(Number(params.limit)||20,50),page=Number(params.page)||1;let sort=type==='top'||type==='search'?'SCORE_DESC':type==='new'?'START_DATE_DESC':'POPULARITY_DESC';const data=await aniList(`query($page:Int,$perPage:Int,$search:String,$sort:[MediaSort]){Page(page:$page,perPage:$perPage){media(type:ANIME,search:$search,sort:$sort,isAdult:false){${MEDIA_FIELDS}}}}`,{page,perPage,search:params.search||null,sort:[sort]});return data.Page.media||[]}
 async function getAnimes(params={}){const data=await shikimori('/animes',{limit:params.limit||20,page:params.page||1,order:params.order||'ranked',search:params.search});return Array.isArray(data)?data.map(normalizeAnime).filter(Boolean):[]}
 async function getAnime(id){const cached=getCachedAnime('id:'+id);if(cached)return cached;const a=normalizeAnime(await shikimori('/animes/'+encodeURIComponent(id)));if(a)cacheAnime('id:'+id,a);return a}
-
 function renderApiRow(id,list){const el=document.getElementById(id);if(!el)return;el.innerHTML=list.map(a=>{cacheAnime(animeStatusKey(a),a);return `<article class="anime-card" data-anime='${encodeURIComponent(JSON.stringify(a))}'><img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy"><div class="info"><div class="title">${esc(a.title)}</div><div class="rating">${esc(a.rating)}</div></div></article>`}).join('')}
 async function loadHomeFromApi(){try{const [popular,newAnime,rated,recommendations]=await Promise.all([getAnimes({limit:6,order:'popularity'}),getAnimes({limit:6,order:'aired_on'}),getAnimes({limit:6,order:'ranked'}),getAnimes({limit:6,order:'popularity',page:2})]);renderApiRow('popular',popular);renderApiRow('newAnime',newAnime);renderApiRow('rated',rated);renderApiRow('recommendations',recommendations)}catch(e){console.error('AnimeSpace home API error:',e)}}
-
 async function loadTopFromApi(){const grid=document.getElementById('topGrid'),podium=document.getElementById('podium');if(!grid&&!podium)return;try{const list=await getAnimes({limit:100,order:'ranked'});const make=(a,i)=>`<article class="top-card" data-anime='${encodeURIComponent(JSON.stringify(a))}'><img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy"><div class="top-info"><div class="top-rank">#${i}</div><div class="top-name">${esc(a.title)}</div><div class="top-rating">★ ${esc(a.rating)}</div><div class="top-meta">${a.episodes||'—'} эпизода · ${esc(a.status||'—')}</div></div></article>`;if(podium)podium.innerHTML=list.slice(0,3).map((a,i)=>make(a,i+1)).join('');if(grid)grid.innerHTML=list.slice(3).map((a,i)=>make(a,i+4)).join('')}catch(e){console.error('AnimeSpace top API error:',e)}}
-
 async function loadScheduleFromApi(){const grid=document.getElementById('grid');if(!grid)return;try{const data=await shikimori('/calendar');window.animeSpaceSchedule=(Array.isArray(data)?data:[]).filter(x=>x.anime).map(x=>{const a=normalizeAnime(x.anime);return a?{...a,episode:x.next_episode,time:x.next_episode_at}:null}).filter(Boolean);if(typeof window.animeSpaceRenderSchedule==='function')window.animeSpaceRenderSchedule()}catch(e){console.error('AnimeSpace schedule API error:',e)}}
 async function searchShikimori(query){return query?getAnimes({search:query,limit:30,order:'ranked'}):[]}
-
 function applyStatuses(userId){const statuses=getStatuses(userId);document.querySelectorAll('.anime-card,.top-card,.schedule-card').forEach(c=>{let data;try{data=JSON.parse(decodeURIComponent(c.dataset.anime||''))}catch{}if(!data)data={title:c.querySelector('.title,.top-name,.schedule-name')?.textContent.trim()||'',image:c.querySelector('img')?.src||''};c.classList.remove('status-plan','status-watching','status-done','status-dropped');const s=statuses[animeStatusKey(data)];if(s)c.classList.add({plan:'status-plan',watching:'status-watching',done:'status-done',dropped:'status-dropped'}[s]||'')})}
-
 document.addEventListener('click',e=>{const c=e.target.closest('.anime-card,.top-card,.schedule-card,.popular-search-card');if(!c)return;let data;try{data=JSON.parse(decodeURIComponent(c.dataset.anime||''))}catch{}if(!data)return;cacheAnime(animeStatusKey(data),data);localStorage.setItem('selectedAnime',JSON.stringify(data));location.href='anime-details.html'});
-
-(async()=>{
- const nav=document.querySelector('.nav'),old=nav?.querySelector('a[href="profile.html"]');if(!old)return;
- old.classList.add('profile-nav');old.id='profileNav';const icon=old.querySelector('.icon');if(icon)icon.id='profileNavIcon';[...old.childNodes].forEach(n=>{if(n.nodeType===3)n.remove()});let text=old.querySelector('.profile-nav-text');if(!text){text=document.createElement('span');text.className='profile-nav-text';old.appendChild(text)}
- function showLogin(){old.href='login.html';old.classList.remove('has-avatar');old.classList.add('login-state');if(icon)icon.innerHTML='';text.textContent='Войти'}
- function showProfile(user){old.href='profile.html';old.classList.remove('login-state');const avatar=localStorage.getItem('animeSpaceAvatar:'+user.id);if(avatar){old.classList.add('has-avatar');if(icon)icon.innerHTML='<img src="'+avatar+'" alt="Аватар">';text.textContent=''}else{old.classList.remove('has-avatar');if(icon)icon.innerHTML='<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c.7-4 3.1-6 7-6s6.3 2 7 6"/></svg>';text.textContent='Профиль'}}}
- try{
-  let client=window.__animeSpaceSupabaseClient;
-  if(!client){if(!window.supabase){const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';document.head.appendChild(s);await new Promise((res,rej)=>{s.onload=res;s.onerror=rej})}client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}});window.__animeSpaceSupabaseClient=client}
-  const update=async()=>{const r=await client.auth.getUser();if(r.data?.user){showProfile(r.data.user);applyStatuses(r.data.user.id)}else showLogin()};await update();client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT')showLogin();else if(session?.user){showProfile(session.user);applyStatuses(session.user.id)}})
- }catch(e){console.warn('Supabase auth:',e);showLogin()}
-})();
-
-loadHomeFromApi();
-loadTopFromApi();
-loadScheduleFromApi();
+(async()=>{const nav=document.querySelector('.nav'),old=nav?.querySelector('a[href="profile.html"]');if(!old)return;old.classList.add('profile-nav');old.id='profileNav';const icon=old.querySelector('.icon');if(icon)icon.id='profileNavIcon';[...old.childNodes].forEach(n=>{if(n.nodeType===3)n.remove()});let text=old.querySelector('.profile-nav-text');if(!text){text=document.createElement('span');text.className='profile-nav-text';old.appendChild(text)}function showLogin(){old.href='login.html';old.classList.remove('has-avatar');old.classList.add('login-state');if(icon)icon.innerHTML='';text.textContent='Войти'}function showProfile(user){old.href='profile.html';old.classList.remove('login-state');const avatar=localStorage.getItem('animeSpaceAvatar:'+user.id);if(avatar){old.classList.add('has-avatar');if(icon)icon.innerHTML='<img src="'+avatar+'" alt="Аватар">';text.textContent=''}else{old.classList.remove('has-avatar');if(icon)icon.innerHTML='<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c.7-4 3.1-6 7-6s6.3 2 7 6"/></svg>';text.textContent='Профиль'}}}try{let client=window.__animeSpaceSupabaseClient;if(!client){if(!window.supabase){const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';document.head.appendChild(s);await new Promise((res,rej)=>{s.onload=res;s.onerror=rej})}client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}});window.__animeSpaceSupabaseClient=client}const update=async()=>{const r=await client.auth.getUser();if(r.data?.user){showProfile(r.data.user);applyStatuses(r.data.user.id)}else showLogin()};await update();client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT')showLogin();else if(session?.user){showProfile(session.user);applyStatuses(session.user.id)}})}catch(e){console.warn('Supabase auth:',e);showLogin()}})();
+loadHomeFromApi();loadTopFromApi();loadScheduleFromApi();
