@@ -1,5 +1,6 @@
 const SHIKIMORI_API = 'https://shikimori.one/api';
 const USER_AGENT = 'AnimeSpace/1.0 (https://free-mancyber.github.io/AnimeSpace/)';
+const SHIKIMORI_REFERER = 'https://shikimori.one/';
 
 function json(res, status, data, cacheSeconds = 60) {
   res.status(status);
@@ -37,9 +38,11 @@ async function shikimori(path, params = {}) {
   }
 
   const response = await fetch(url, {
+    method: 'GET',
     headers: {
       Accept: 'application/json',
-      'User-Agent': USER_AGENT
+      'User-Agent': USER_AGENT,
+      Referer: SHIKIMORI_REFERER
     }
   });
 
@@ -48,12 +51,19 @@ async function shikimori(path, params = {}) {
   try {
     data = JSON.parse(text);
   } catch {
-    data = { error: text.slice(0, 500) };
+    data = { error: text.slice(0, 1000) };
   }
 
   if (!response.ok) {
     const error = new Error(`Shikimori API: ${response.status}`);
     error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  if (!Array.isArray(data) && !data?.id && !data?.name) {
+    const error = new Error('Shikimori API returned an unexpected response');
+    error.status = 502;
     error.data = data;
     throw error;
   }
@@ -67,27 +77,27 @@ module.exports = async (req, res) => {
 
   try {
     const { type, id, q, page = 1, limit = 20 } = req.query;
-    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
 
     if (type === 'popular') {
       const data = await shikimori('/animes', { limit: safeLimit, page, order: 'popularity' });
-      return json(res, 200, data.map(normalizeAnime));
+      return json(res, 200, data.map(normalizeAnime).filter(Boolean));
     }
 
     if (type === 'top') {
       const data = await shikimori('/animes', { limit: safeLimit, page, order: 'ranked' });
-      return json(res, 200, data.map(normalizeAnime));
+      return json(res, 200, data.map(normalizeAnime).filter(Boolean));
     }
 
     if (type === 'new') {
       const data = await shikimori('/animes', { limit: safeLimit, page, order: 'aired_on' });
-      return json(res, 200, data.map(normalizeAnime));
+      return json(res, 200, data.map(normalizeAnime).filter(Boolean));
     }
 
     if (type === 'search') {
       if (!q || String(q).trim().length < 2) return json(res, 400, { error: 'Search query is too short' }, 0);
       const data = await shikimori('/animes', { limit: safeLimit, page, order: 'ranked', search: String(q).trim() });
-      return json(res, 200, data.map(normalizeAnime), 30);
+      return json(res, 200, data.map(normalizeAnime).filter(Boolean), 30);
     }
 
     if (type === 'schedule') {
@@ -106,7 +116,7 @@ module.exports = async (req, res) => {
       available: ['popular', 'top', 'new', 'search', 'schedule', 'details']
     }, 0);
   } catch (error) {
-    console.error(error);
+    console.error('AnimeSpace backend error:', error);
     return json(res, error.status || 502, {
       error: error.message || 'Backend request failed',
       details: error.data || null
