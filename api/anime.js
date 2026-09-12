@@ -7,7 +7,13 @@ function json(res, status, data, cacheSeconds = 60) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Cache-Control', `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 5}`);
+  if (cacheSeconds <= 0) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  } else {
+    res.setHeader('Cache-Control', `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 5}`);
+  }
   res.end(JSON.stringify(data));
 }
 
@@ -117,7 +123,7 @@ module.exports = async (req, res) => {
 
     if (type === 'schedule') {
       const schedule = await anilibriaSchedule();
-      return json(res, 200, schedule, 120);
+      return json(res, 200, schedule, 0);
     }
 
     if (type === 'details') {
