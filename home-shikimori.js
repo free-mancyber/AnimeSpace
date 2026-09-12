@@ -64,11 +64,6 @@
     if (el && list?.length) el.innerHTML = list.map(card).join('');
   }
   async function init() {
-    // Очищаем только кэш Shikimori главной страницы перед новым запросом.
-    ['recommendations', 'popular', 'new', 'top'].forEach(key => {
-      try { localStorage.removeItem(cacheKey(key)); } catch {}
-    });
-
     try {
       const [recommendations, popular, newest, rated] = await Promise.all([
         load('recommendations', { limit: 12, order: 'popularity', status: 'ongoing', page: 2 }),
