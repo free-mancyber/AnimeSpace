@@ -1,4 +1,5 @@
 const ANILIST_API = 'https://graphql.anilist.co';
+const ANILIBRIA_API = 'https://api.anilibria.tv/v3';
 
 function json(res, status, data, cacheSeconds = 60) {
   res.status(status);
@@ -51,9 +52,22 @@ async function anilist(query, variables = {}) {
   return data.data;
 }
 
+async function anilibriaSchedule() {
+  const response = await fetch(`${ANILIBRIA_API}/title/schedule?filter=id,names,posters,type,status,season,player`, {
+    headers: { Accept: 'application/json' }
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    const error = new Error(`AniLibria API request failed: ${response.status}`);
+    error.status = response.status || 502;
+    error.data = data;
+    throw error;
+  }
+  return data;
+}
+
 const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}}`;
 const ANILIST_DETAILS_QUERY = `query($id:Int){Media(id:$id,type:ANIME){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}`;
-const ANILIST_SCHEDULE_QUERY = `query($page:Int,$perPage:Int,$start:Int,$end:Int){Page(page:$page,perPage:$perPage){airingSchedules(airingAt_greater:$start,airingAt_lesser:$end){airingAt episode media{id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}}}`;
 
 async function anilistList({ page = 1, limit = 20, order = 'ranked', search } = {}) {
   let sort = ['SCORE_DESC'];
@@ -102,19 +116,8 @@ module.exports = async (req, res) => {
     }
 
     if (type === 'schedule') {
-      const now = Math.floor(Date.now() / 1000);
-      const data = await anilist(ANILIST_SCHEDULE_QUERY, {
-        page: 1,
-        perPage: 50,
-        start: now - 86400,
-        end: now + 7 * 86400
-      });
-      const list = (data.Page?.airingSchedules || []).map(x => ({
-        anime: normalizeAniList(x.media),
-        next_episode: x.episode,
-        next_episode_at: x.airingAt ? new Date(x.airingAt * 1000).toISOString() : ''
-      })).filter(x => x.anime);
-      return json(res, 200, list, 120);
+      const schedule = await anilibriaSchedule();
+      return json(res, 200, schedule, 120);
     }
 
     if (type === 'details') {
