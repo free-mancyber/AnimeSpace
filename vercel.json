@@ -1,8 +1,9 @@
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
   "functions": {
     "api/anime.js": {
-      "runtime": "nodejs22.x"
+      "maxDuration": 60
     }
   }
 }
