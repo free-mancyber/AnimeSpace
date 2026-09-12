@@ -31,6 +31,34 @@ async function anilist(query, variables = {}) {
   return data.data;
 }
 
+function parseWeekday(rawDay) {
+  let dayVal = (rawDay && typeof rawDay === 'object' && 'value' in rawDay) ? rawDay.value : rawDay;
+  if (dayVal === null || dayVal === undefined) return null;
+  const num = Number(dayVal);
+  if (!isNaN(num)) {
+    if (num >= 1 && num <= 7) return num - 1;
+    if (num >= 0 && num <= 6) return num;
+  }
+  if (typeof dayVal === 'string') {
+    const str = dayVal.toLowerCase().trim();
+    if (str.startsWith('mon')) return 0;
+    if (str.startsWith('tue')) return 1;
+    if (str.startsWith('wed')) return 2;
+    if (str.startsWith('thu')) return 3;
+    if (str.startsWith('fri')) return 4;
+    if (str.startsWith('sat')) return 5;
+    if (str.startsWith('sun')) return 6;
+    if (str.startsWith('пн') || str.startsWith('пон')) return 0;
+    if (str.startsWith('вт')) return 1;
+    if (str.startsWith('ср')) return 2;
+    if (str.startsWith('чт') || str.startsWith('чет')) return 3;
+    if (str.startsWith('пт') || str.startsWith('пят')) return 4;
+    if (str.startsWith('сб') || str.startsWith('суб')) return 5;
+    if (str.startsWith('вс') || str.startsWith('вос')) return 6;
+  }
+  return null;
+}
+
 async function anilibriaSchedule() {
   const response = await fetch(`${ANILIBRIA_API}/anime/schedule/now`, { headers: { Accept: 'application/json' } });
   const data = await response.json();
@@ -46,7 +74,11 @@ async function anilibriaSchedule() {
     const ep = item?.published_release_episode || {};
     const imagePath = poster.optimized?.preview || poster.preview || poster.optimized?.thumbnail || poster.thumbnail || '';
     const image = imagePath ? (String(imagePath).startsWith('http') ? imagePath : `https://anilibria.top${imagePath}`) : '';
-    const publishDay = Number(r.publish_day?.value);
+    let weekday = parseWeekday(r.publish_day);
+    if (weekday === null && r.time) {
+      const date = new Date(r.time);
+      if (!isNaN(date.getTime())) weekday = (date.getDay() + 6) % 7;
+    }
     return {
       id: r.id,
       title: r.name?.main || r.name?.english || r.name?.alternative || 'Без названия',
@@ -60,7 +92,7 @@ async function anilibriaSchedule() {
       description: r.description || '',
       episode: ep.ordinal ?? item?.next_release_episode_number ?? null,
       time: ep.updated_at || null,
-      weekday: Number.isInteger(publishDay) && publishDay >= 1 && publishDay <= 7 ? publishDay - 1 : null,
+      weekday,
       source: 'aniliberty'
     };
   }).filter(x => x.id && x.image);
