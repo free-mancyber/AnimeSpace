@@ -1,5 +1,5 @@
 const ANILIST_API = 'https://graphql.anilist.co';
-const ANILIBRIA_API = 'https://api.anilibria.tv/v3';
+const ANILIBRIA_API = 'https://anilibria.top/api/v1';
 
 function json(res, status, data, cacheSeconds = 60) {
   res.status(status);
@@ -58,8 +58,35 @@ async function anilist(query, variables = {}) {
   return data.data;
 }
 
+function normalizeAniLibertyImage(poster) {
+  const value = poster?.optimized?.preview || poster?.preview || poster?.optimized?.thumbnail || poster?.thumbnail || '';
+  if (!value) return '';
+  return /^https?:\/\//i.test(value) ? value : `https://anilibria.top${value}`;
+}
+
+function normalizeAniLibertyRelease(item) {
+  const release = item?.release || {};
+  const episode = item?.published_release_episode || null;
+  return {
+    id: release.id || item?.id,
+    title: release.name?.main || release.name?.english || release.name?.alternative || 'Без названия',
+    image: normalizeAniLibertyImage(release.poster),
+    rating: '—',
+    year: release.year || null,
+    episodes: release.episodes_total || 0,
+    status: release.is_ongoing ? 'Выходит' : 'Вышел',
+    duration: release.average_duration_of_episode || 0,
+    genres: [],
+    description: release.description || '',
+    episode: episode?.ordinal ?? null,
+    time: episode?.updated_at || release.updated_at || null,
+    weekday: release.publish_day?.value || null,
+    source: 'anilibria'
+  };
+}
+
 async function anilibriaSchedule() {
-  const response = await fetch(`${ANILIBRIA_API}/title/schedule?filter=id,names,posters,type,status,season,player`, {
+  const response = await fetch(`${ANILIBRIA_API}/anime/schedule/now`, {
     headers: { Accept: 'application/json' }
   });
   const data = await response.json();
@@ -69,7 +96,15 @@ async function anilibriaSchedule() {
     error.data = data;
     throw error;
   }
-  return data;
+
+  const days = [];
+  const dayNames = { yesterday: 0, today: 1, tomorrow: 2 };
+  for (const [key, list] of Object.entries(data || {})) {
+    if (!Array.isArray(list)) continue;
+    const day = dayNames[key];
+    days.push({ day, list: list.map(normalizeAniLibertyRelease).filter(Boolean) });
+  }
+  return days;
 }
 
 const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}}`;
