@@ -1,7 +1,7 @@
 const ANIME_CACHE_KEY='animeSpaceApiCache:v4';
 const ANIME_CACHE_TTL=7*24*60*60*1000;
 const ANILIST_API='https://graphql.anilist.co';
-const ANIME_API='https://anime-space-5oftlp527-anime-space.vercel.app/api/anime';
+const ANIME_API='https://anime-space-rust.vercel.app/api/anime';
 const SUPABASE_URL='https://vbxjvwssjafcfbmqrqow.supabase.co';
 const SUPABASE_KEY='sb_publishable__5mPBElGBo1GFn7Yd0n4Ng_1i28p6aE';
 function getAnimeCache(){try{return JSON.parse(localStorage.getItem(ANIME_CACHE_KEY)||'{}')}catch{return {}}}
