@@ -59,6 +59,23 @@ function parseWeekday(rawDay) {
   return null;
 }
 
+function fixPosterUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  const value = url.trim();
+  if (!value) return null;
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  if (value.startsWith('//')) return `https:${value}`;
+  if (value.startsWith('/')) return `https://anilibria.top${value}`;
+  return `https://anilibria.top/${value}`;
+}
+
+function extractPosterUrl(poster) {
+  if (!poster) return null;
+  if (typeof poster === 'string') return fixPosterUrl(poster);
+  const rawUrl = poster.optimized?.original || poster.optimized?.preview || poster.optimized?.thumbnail || poster.original || poster.preview || poster.thumbnail || poster.url || poster.small?.url || poster.small || poster.medium?.url || poster.medium || poster.large?.url || poster.large;
+  return fixPosterUrl(rawUrl);
+}
+
 async function anilibriaSchedule() {
   const response = await fetch(`${ANILIBRIA_API}/anime/schedule/now`, { headers: { Accept: 'application/json' } });
   const data = await response.json();
@@ -70,10 +87,9 @@ async function anilibriaSchedule() {
   ];
   return days.map(item => {
     const r = item?.release || {};
-    const poster = r.poster || {};
+    const poster = r.poster || r.posters || {};
     const ep = item?.published_release_episode || {};
-    const imagePath = poster.optimized?.preview || poster.preview || poster.optimized?.thumbnail || poster.thumbnail || '';
-    const image = imagePath ? (String(imagePath).startsWith('http') ? imagePath : `https://anilibria.top${imagePath}`) : '';
+    const image = extractPosterUrl(poster);
     let weekday = parseWeekday(r.publish_day);
     if (weekday === null && r.time) {
       const date = new Date(r.time);
@@ -95,7 +111,7 @@ async function anilibriaSchedule() {
       weekday,
       source: 'aniliberty'
     };
-  }).filter(x => x.id && x.image);
+  }).filter(x => x.id);
 }
 
 const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}}`;
