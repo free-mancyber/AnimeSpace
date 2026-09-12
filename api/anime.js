@@ -77,20 +77,16 @@ function extractPosterUrl(poster) {
 }
 
 async function anilibriaSchedule() {
-  const response = await fetch(`${ANILIBRIA_API}/anime/schedule/now`, { headers: { Accept: 'application/json' } });
+  const response = await fetch(`${ANILIBRIA_API}/anime/schedule/week`, { headers: { Accept: 'application/json' } });
   const data = await response.json();
   if (!response.ok) { const error = new Error(`AniLiberty API request failed: ${response.status}`); error.status = response.status || 502; error.data = data; throw error; }
-  const days = [
-    ...(Array.isArray(data?.yesterday) ? data.yesterday : []),
-    ...(Array.isArray(data?.today) ? data.today : []),
-    ...(Array.isArray(data?.tomorrow) ? data.tomorrow : [])
-  ];
-  return days.map(item => {
+  const releases = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+  return releases.map(item => {
     const r = item?.release || {};
     const poster = r.poster || r.posters || {};
     const ep = item?.published_release_episode || {};
     const image = extractPosterUrl(poster);
-    let weekday = parseWeekday(r.publish_day);
+    let weekday = parseWeekday(r.publish_day || item?.publish_day);
     if (weekday === null && r.time) {
       const date = new Date(r.time);
       if (!isNaN(date.getTime())) weekday = (date.getDay() + 6) % 7;
