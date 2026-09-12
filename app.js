@@ -25,30 +25,13 @@ async function loadScheduleFromApi(){const grid=document.getElementById('grid');
 async function searchShikimori(query){return query?getAnimes({search:query,limit:30,order:'ranked'}):[]}
 function applyStatuses(userId){const statuses=getStatuses(userId);document.querySelectorAll('.anime-card,.top-card,.schedule-card').forEach(c=>{let data;try{data=JSON.parse(decodeURIComponent(c.dataset.anime||''))}catch{}if(!data)data={title:c.querySelector('.title,.top-name,.schedule-name')?.textContent.trim()||'',image:c.querySelector('img')?.src||''};c.classList.remove('status-plan','status-watching','status-done','status-dropped');const s=statuses[animeStatusKey(data)];if(s)c.classList.add({plan:'status-plan',watching:'status-watching',done:'status-done',dropped:'status-dropped'}[s]||'')})}
 document.addEventListener('click',e=>{const c=e.target.closest('.anime-card,.top-card,.schedule-card,.popular-search-card');if(!c)return;let data;try{data=JSON.parse(decodeURIComponent(c.dataset.anime||''))}catch{}if(!data)return;cacheAnime(animeStatusKey(data),data);localStorage.setItem('selectedAnime',JSON.stringify(data));location.href='anime-details.html'});
-(async()=>{
- const nav=document.querySelector('.nav');
- if(!nav)return;
- let profile=nav.querySelector('a.profile-nav')||nav.querySelector('a[href="profile.html"]');
- if(!profile){profile=document.createElement('a');profile.href='profile.html';profile.className='profile-nav';nav.appendChild(profile)}
- profile.classList.add('profile-nav');profile.id='profileNav';
- let icon=profile.querySelector('.icon');
- if(!icon){icon=document.createElement('span');icon.className='icon';profile.prepend(icon)}
- icon.id='profileNavIcon';
- let text=profile.querySelector('.profile-nav-text')||profile.querySelector('#profileNavText');
- if(!text){text=document.createElement('span');profile.appendChild(text)}
- text.className='profile-nav-text';text.id='profileNavText';
- function showLogin(){profile.href='login.html';profile.classList.remove('has-avatar');profile.classList.add('login-state');icon.innerHTML='';text.textContent='Войти'}
- function showProfile(user){profile.href='profile.html';profile.classList.remove('login-state');const avatar=localStorage.getItem('animeSpaceAvatar:'+user.id);if(avatar){profile.classList.add('has-avatar');icon.innerHTML='<img src="'+avatar+'" alt="Аватар">';text.textContent=''}else{profile.classList.remove('has-avatar');icon.innerHTML='<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c.7-4 3.1-6 7-6s6.3 2 7 6"/></svg>';text.textContent='Профиль'}}
- try{
-   let client=window.__animeSpaceSupabaseClient;
-   if(!client){
-     if(!window.supabase){const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';document.head.appendChild(s);await new Promise((res,rej)=>{s.onload=res;s.onerror=rej})}
-     client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}});
-     window.__animeSpaceSupabaseClient=client;
-   }
-   const update=async()=>{const r=await client.auth.getUser();if(r.data?.user){showProfile(r.data.user);applyStatuses(r.data.user.id)}else showLogin()};
-   await update();
-   client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT')showLogin();else if(session?.user){showProfile(session.user);applyStatuses(session.user.id)}});
- }catch(e){console.warn('Supabase auth:',e);showLogin()}
+(function(){
+ function findProfileNav(){const nav=document.querySelector('.nav');if(!nav)return null;let p=nav.querySelector('#profileNav')||nav.querySelector('a.profile-nav')||nav.querySelector('a[href="profile.html"]');if(!p){p=document.createElement('a');p.href='profile.html';p.className='profile-nav';nav.appendChild(p)}p.classList.add('profile-nav');p.id='profileNav';let icon=p.querySelector('#profileNavIcon,.icon');if(!icon){icon=document.createElement('span');icon.className='icon';p.prepend(icon)}icon.id='profileNavIcon';let text=p.querySelector('#profileNavText,.profile-nav-text');if(!text){text=document.createElement('span');p.appendChild(text)}text.id='profileNavText';text.className='profile-nav-text';return {p,icon,text}}
+ const refs=findProfileNav();if(!refs)return;const {p,icon,text}=refs;
+ function defaultIcon(){return '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c.7-4 3.1-6 7-6s6.3 2 7 6"/></svg>'}
+ function getStoredAvatar(user){if(user){const a=localStorage.getItem('animeSpaceAvatar:'+user.id);if(a)return a}for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf('animeSpaceAvatar:')===0){const a=localStorage.getItem(k);if(a)return a}}return null}
+ function paint(user){if(!user){p.href='login.html';p.classList.add('login-state');p.classList.remove('has-avatar');icon.innerHTML='';text.textContent='Войти';return}p.href='profile.html';p.classList.remove('login-state');const a=getStoredAvatar(user);if(a){p.classList.add('has-avatar');icon.innerHTML='<img src="'+a+'" alt="Аватар">';text.textContent=''}else{p.classList.remove('has-avatar');icon.innerHTML=defaultIcon();text.textContent='Профиль'}}
+ async function init(){try{let client=window.__animeSpaceSupabaseClient;if(!client){if(!window.supabase){return}client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}});window.__animeSpaceSupabaseClient=client}const sessionResult=await client.auth.getSession();const session=sessionResult.data?.session;if(session?.user){paint(session.user);applyStatuses(session.user.id)}else{const userResult=await client.auth.getUser();if(userResult.data?.user){paint(userResult.data.user);applyStatuses(userResult.data.user.id)}else{const avatar=getStoredAvatar(null);if(avatar){p.href='profile.html';p.classList.remove('login-state');p.classList.add('has-avatar');icon.innerHTML='<img src="'+avatar+'" alt="Аватар">';text.textContent=''}else paint(null)}}client.auth.onAuthStateChange((event,s)=>{if(event==='SIGNED_OUT')paint(null);else if(s?.user){paint(s.user);applyStatuses(s.user.id)}})}catch(e){console.warn('AnimeSpace auth:',e);const avatar=getStoredAvatar(null);if(avatar){p.href='profile.html';p.classList.remove('login-state');p.classList.add('has-avatar');icon.innerHTML='<img src="'+avatar+'" alt="Аватар">';text.textContent=''}else paint(null)}}
+ init();
 })();
 loadHomeFromApi();loadTopFromApi();loadScheduleFromApi();
