@@ -16,10 +16,12 @@ async function loadTopCategory(category){
 
   try{
     let filter='';
+    let variableDefs='$page:Int,$perPage:Int,$sort:[MediaSort]';
     const variables={perPage:50,sort:['SCORE_DESC']};
 
     if(category==='year'){
       filter=',startDate_greater:$from,startDate_lesser:$to';
+      variableDefs+=',$from:FuzzyDateInt,$to:FuzzyDateInt';
       const year=new Date().getFullYear();
       variables.from=year*10000+101;
       variables.to=year*10000+1231;
@@ -27,13 +29,14 @@ async function loadTopCategory(category){
 
     if(category==='season'){
       filter=',season:$season,seasonYear:$seasonYear';
+      variableDefs+=',$season:MediaSeason,$seasonYear:Int';
       variables.season=getCurrentSeason();
       variables.seasonYear=new Date().getFullYear();
     }
 
     if(category==='popular')variables.sort=['POPULARITY_DESC'];
 
-    const query=`query($page:Int,$perPage:Int,$sort:[MediaSort],$from:FuzzyDateInt,$to:FuzzyDateInt,$season:MediaSeason,$seasonYear:Int){Page(page:$page,perPage:$perPage){media(type:ANIME,isAdult:false,sort:$sort${filter}){${MEDIA_FIELDS}}}}`;
+    const query=`query(${variableDefs}){Page(page:$page,perPage:$perPage){media(type:ANIME,isAdult:false,sort:$sort${filter}){${MEDIA_FIELDS}}}}`;
 
     const first=await aniList(query,{...variables,page:1});
     const second=await aniList(query,{...variables,page:2});
