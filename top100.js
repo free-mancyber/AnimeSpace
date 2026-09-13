@@ -10,6 +10,13 @@ function topPackAnime(item){
   try{return encodeURIComponent(JSON.stringify(item)).replace(/'/g,'%27')}catch{return ''}
 }
 
+function topImage(item){
+  const direct=typeof item?.image==='string'?item.image.trim():'';
+  if(direct)return direct;
+  const id=item?.id;
+  return id?`https://img.anili.st/media/${encodeURIComponent(id)}`:'';
+}
+
 async function loadTopCategory(category){
   const grid=document.getElementById('topGrid');
   const podium=document.getElementById('podium');
@@ -33,7 +40,6 @@ async function loadTopCategory(category){
 
       const data=await response.json();
       if(!Array.isArray(data))throw new Error('Top API вернул не массив');
-
       items.push(...data);
       if(data.length<50)break;
     }
@@ -41,14 +47,19 @@ async function loadTopCategory(category){
     const list=items.slice(0,100).filter(item=>item&&typeof item==='object');
 
     const makeCard=(item,rank)=>{
-      const imageUrl=item.image||'';
+      const imageUrl=topImage(item);
       const titleText=typeof item.title==='string'
         ?item.title
-        :(item.title?.userPreferred||item.title?.romaji||item.title?.english||'Без названия');
+        :(item.title?.userPreferred||item.title?.romaji||item.title?.english||item.title?.native||'Без названия');
       const ratingVal=item.rating||'—';
+      const packed=topPackAnime({...item,image:imageUrl});
+      const fallback=imageUrl&&item?.id?`https://img.anili.st/media/${encodeURIComponent(item.id)}`:'';
+      const onError=fallback&&fallback!==imageUrl
+        ?`this.onerror=null;this.src='${topEsc(fallback)}'`
+        :`this.onerror=null;this.style.visibility='hidden'`;
 
-      return `<article class="top-card" data-anime="${topPackAnime(item)}">
-        <img src="${topEsc(imageUrl)}" alt="${topEsc(titleText)}" loading="lazy" referrerpolicy="no-referrer">
+      return `<article class="top-card" data-anime="${packed}">
+        <img src="${topEsc(imageUrl)}" alt="${topEsc(titleText)}" loading="lazy" referrerpolicy="no-referrer" onerror="${onError}">
         <div class="top-info">
           <div class="top-rank">#${rank}</div>
           <div class="top-name">${topEsc(titleText)}</div>
