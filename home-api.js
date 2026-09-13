@@ -13,5 +13,4 @@ async function loadHomeFromApi(){
   }
 }
 
-if(typeof window.loadTopFromApi!=='function') window.loadTopFromApi=async()=>{};
-if(typeof window.loadScheduleFromApi!=='function') window.loadScheduleFromApi=async()=>{};
+if(document.getElementById('recommendations')) loadHomeFromApi();
