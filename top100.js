@@ -16,7 +16,7 @@ async function loadTopCategory(category){
 
   try{
     let filter='';
-    let variables={page:1,perPage:100,sort:['SCORE_DESC']};
+    const variables={perPage:50,sort:['SCORE_DESC']};
 
     if(category==='year'){
       filter=',startDate_greater:$from,startDate_lesser:$to';
@@ -34,8 +34,10 @@ async function loadTopCategory(category){
     if(category==='popular')variables.sort=['POPULARITY_DESC'];
 
     const query=`query($page:Int,$perPage:Int,$sort:[MediaSort],$from:FuzzyDateInt,$to:FuzzyDateInt,$season:MediaSeason,$seasonYear:Int){Page(page:$page,perPage:$perPage){media(type:ANIME,isAdult:false,sort:$sort${filter}){${MEDIA_FIELDS}}}}`;
-    const data=await aniList(query,variables);
-    const list=(data.Page?.media||[]).map(normalizeAnime).filter(Boolean);
+
+    const first=await aniList(query,{...variables,page:1});
+    const second=await aniList(query,{...variables,page:2});
+    const list=[...(first.Page?.media||[]),...(second.Page?.media||[])].map(normalizeAnime).filter(Boolean).slice(0,100);
 
     const make=(a,i)=>`<article class="top-card" data-anime='${packAnime(a)}'><img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy"><div class="top-info"><div class="top-rank">#${i}</div><div class="top-name">${esc(a.title)}</div><div class="top-rating">★ ${esc(a.rating)}</div><div class="top-meta">${a.episodes||'—'} эпизода · ${esc(a.status||'—')}</div></div></article>`;
 
