@@ -34,7 +34,11 @@ function normalizeAniList(a) {
 async function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 async function anilist(query, variables = {}, attempt = 0) {
-  const response = await fetch(ANILIST_API, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ query, variables }) });
+  const response = await fetch(ANILIST_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query, variables })
+  });
   let data = null;
   try { data = await response.json(); } catch (_) {}
   if (response.status === 429 && attempt < 2) {
@@ -221,27 +225,17 @@ module.exports = async (req, res) => {
   try {
     const { type, id, q, page = 1, limit = 20, category = 'overall' } = req.query;
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
-    if (type === 'popular') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'popularity' }));
-    if (type === 'top') return json(res, 200, await getTopCached(category, page, safeLimit), 60);
-    if (type === 'new') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'aired_on' }));
-    if (type === 'search') {
-      const query = String(q || '').trim();
-      const genres = String(req.query.genres || '').split(',').map(x => decodeURIComponent(x).trim()).filter(Boolean);
-      const year = String(req.query.year || '').trim();
-      const rating = String(req.query.rating || '').trim();
-      const searchType = String(req.query.format || '').trim();
-      if (query.length < 2 && !genres.length && !year && !rating && !searchType) return json(res, 400, { error: 'Search query is too short' }, 0);
-      return json(res, 200, await searchWithFallback(query, safeLimit, { genres, year, rating, type: searchType }), 30);
-    }
-    if (type === 'schedule') return json(res, 200, await anilibriaSchedule(), 0);
-    if (type === 'details') {
-      if (!id) return json(res, 400, { error: 'Anime id is required' }, 0);
+    if (type === 'popular') return json(res, await anilistList({ page, limit: safeLimit, order: 'popularity' }), 200, 30);
+    if (type === 'search') return json(res, await searchWithFallback(q || '', safeLimit, { genres: req.query.genres ? String(req.query.genres).split(',').map(x => decodeURIComponent(x)).filter(Boolean) : [], year: req.query.year || '', rating: req.query.rating || '', type: req.query.format || '' }), 200, 0);
+    if (type === 'top') return json(res, await getTopCached(category, Number(page) || 1, safeLimit), 200, 30);
+    if (type === 'schedule') return json(res, await anilibriaSchedule(), 200, 30);
+    if (type === 'details' && id) {
       const data = await anilist(ANILIST_DETAILS_QUERY, { id: Number(id) });
-      return json(res, 200, normalizeAniList(data.Media), 300);
+      return json(res, normalizeAniList(data.Media), 200, 60);
     }
-    return json(res, 400, { error: 'Unknown type', available: ['popular', 'top', 'new', 'search', 'schedule', 'details'] }, 0);
+    return json(res, await anilistList({ page, limit: safeLimit, order: 'ranked' }), 200, 30);
   } catch (error) {
-    console.error('AnimeSpace backend error:', error);
-    return json(res, error.status || 502, { error: error.message || 'Backend request failed', details: error.data || null }, 0);
+    console.error('Anime API error:', error);
+    return json(res, error?.status || 500, { error: error?.message || 'API error' }, 0);
   }
 };
