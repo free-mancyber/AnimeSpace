@@ -34,13 +34,11 @@ async function anilist(query, variables = {}, attempt = 0) {
   const response = await fetch(ANILIST_API, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ query, variables }) });
   let data = null;
   try { data = await response.json(); } catch (_) {}
-
   if (response.status === 429 && attempt < 2) {
     const retryAfter = Number(response.headers.get('retry-after')) || 0;
     await sleep(Math.max(1200, retryAfter * 1000, 1200 * (attempt + 1)));
     return anilist(query, variables, attempt + 1);
   }
-
   if (!response.ok || data?.errors) {
     const error = new Error('AniList API request failed');
     error.status = response.status || 502;
@@ -48,19 +46,6 @@ async function anilist(query, variables = {}, attempt = 0) {
     throw error;
   }
   return data.data;
-}
-
-async function getAniListRating(title) {
-  if (!title) return '—';
-  try {
-    const query = `query($search:String){Page(page:1,perPage:5){media(type:ANIME,search:$search,isAdult:false,sort:SEARCH_MATCH){title{romaji english native}averageScore}}}`;
-    const data = await anilist(query, { search: String(title).trim() });
-    const media = data?.Page?.media || [];
-    const scored = media.find(item => Number.isFinite(item?.averageScore));
-    return Number.isFinite(scored?.averageScore) ? (scored.averageScore / 10).toFixed(1) : '—';
-  } catch (_) {
-    return '—';
-  }
 }
 
 function parseWeekday(rawDay) {
@@ -109,19 +94,11 @@ function extractPosterUrl(poster) {
 }
 
 async function fetchWithFallback(endpointPath) {
-  const baseUrls = [
-    'https://anilibria.top/api/v1',
-    'https://api.anilibria.app/api/v1'
-  ];
+  const baseUrls = [ANILIBRIA_API, 'https://api.anilibria.app/api/v1'];
   let lastError = null;
   for (const baseUrl of baseUrls) {
     try {
-      const response = await fetch(`${baseUrl}${endpointPath}`, {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AnimeSpace/1.0'
-        }
-      });
+      const response = await fetch(`${baseUrl}${endpointPath}`, { headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 AnimeSpace/1.0' } });
       if (response.ok) return await response.json();
       console.warn(`[AniLiberty] ${baseUrl} returned status: ${response.status}`);
       lastError = new Error(`API returned status ${response.status}`);
@@ -136,7 +113,7 @@ async function fetchWithFallback(endpointPath) {
 async function anilibriaSchedule() {
   const data = await fetchWithFallback('/anime/schedule/week');
   const rawList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
-  const list = rawList.map(item => {
+  return rawList.map(item => {
     const r = item?.release || item || {};
     const poster = r.poster || r.posters || {};
     const ep = item?.published_release_episode || {};
@@ -162,16 +139,7 @@ async function anilibriaSchedule() {
       weekday,
       source: 'aniliberty'
     };
-  }).filter(x => x.id);
-
-  const rated = [];
-  for (let i = 0; i < list.length; i += 4) {
-    const batch = list.slice(i, i + 4);
-    const results = await Promise.all(batch.map(async anime => ({ ...anime, rating: await getAniListRating(anime.title) })));
-    rated.push(...results);
-    if (i + 4 < list.length) await sleep(150);
-  }
-  return rated;
+  }).filter(x => x.id && x.image && x.title);
 }
 
 const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType,$from:FuzzyDateInt,$to:FuzzyDateInt,$season:MediaSeason,$seasonYear:Int){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort,startDate_greater:$from,startDate_lesser:$to,season:$season,seasonYear:$seasonYear){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}}`;
