@@ -133,14 +133,25 @@ async function anilibriaSchedule() {
   }).filter(x => x.id);
 }
 
-const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}}`;
+const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType,$from:FuzzyDateInt,$to:FuzzyDateInt,$season:MediaSeason,$seasonYear:Int){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort,startDate_greater:$from,startDate_lesser:$to,season:$season,seasonYear:$seasonYear){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}}`;
 const ANILIST_DETAILS_QUERY = `query($id:Int){Media(id:$id,type:ANIME){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}`;
 
-async function anilistList({ page = 1, limit = 20, order = 'ranked', search } = {}) {
+async function anilistList({ page = 1, limit = 20, order = 'ranked', search, category = 'overall' } = {}) {
   let sort = ['SCORE_DESC'];
   if (order === 'popularity') sort = ['POPULARITY_DESC'];
   if (order === 'aired_on') sort = ['START_DATE_DESC'];
-  const data = await anilist(ANILIST_LIST_QUERY, { page: Number(page) || 1, perPage: Math.min(Number(limit) || 20, 50), sort, search: search || undefined, type: 'ANIME' });
+  const variables = { page: Number(page) || 1, perPage: Math.min(Number(limit) || 20, 50), sort, search: search || undefined, type: 'ANIME' };
+  if (category === 'year') {
+    const year = new Date().getFullYear();
+    variables.from = year * 10000 + 101;
+    variables.to = year * 10000 + 1231;
+  }
+  if (category === 'season') {
+    const month = new Date().getMonth() + 1;
+    variables.season = month <= 3 ? 'WINTER' : month <= 6 ? 'SPRING' : month <= 9 ? 'SUMMER' : 'FALL';
+    variables.seasonYear = new Date().getFullYear();
+  }
+  const data = await anilist(ANILIST_LIST_QUERY, variables);
   return (data.Page?.media || []).map(normalizeAniList).filter(Boolean);
 }
 
@@ -148,10 +159,10 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return json(res, 204, null, 0);
   if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' }, 0);
   try {
-    const { type, id, q, page = 1, limit = 20 } = req.query;
+    const { type, id, q, page = 1, limit = 20, category = 'overall' } = req.query;
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
     if (type === 'popular') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'popularity' }));
-    if (type === 'top') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'ranked' }));
+    if (type === 'top') return json(res, 200, await anilistList({ limit: safeLimit, page, order: category === 'popular' ? 'popularity' : 'ranked', category }), 0);
     if (type === 'new') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'aired_on' }));
     if (type === 'search') {
       if (!q || String(q).trim().length < 2) return json(res, 400, { error: 'Search query is too short' }, 0);
