@@ -76,17 +76,40 @@ function extractPosterUrl(poster) {
   return fixPosterUrl(rawUrl);
 }
 
+async function fetchWithFallback(endpointPath) {
+  const baseUrls = [
+    'https://anilibria.top/api/v1',
+    'https://api.anilibria.app/api/v1'
+  ];
+  let lastError = null;
+  for (const baseUrl of baseUrls) {
+    try {
+      const response = await fetch(`${baseUrl}${endpointPath}`, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AnimeSpace/1.0'
+        }
+      });
+      if (response.ok) return await response.json();
+      console.warn(`[AniLiberty] ${baseUrl} returned status: ${response.status}`);
+      lastError = new Error(`API returned status ${response.status}`);
+    } catch (err) {
+      console.error(`[AniLiberty] Failed fetch from ${baseUrl}:`, err.message);
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('All AniLiberty mirrors failed');
+}
+
 async function anilibriaSchedule() {
-  const response = await fetch(`${ANILIBRIA_API}/anime/schedule/week`, { headers: { Accept: 'application/json' } });
-  const data = await response.json();
-  if (!response.ok) { const error = new Error(`AniLiberty API request failed: ${response.status}`); error.status = response.status || 502; error.data = data; throw error; }
-  const releases = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
-  return releases.map(item => {
-    const r = item?.release || {};
+  const data = await fetchWithFallback('/anime/schedule/week');
+  const rawList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+  return rawList.map(item => {
+    const r = item?.release || item || {};
     const poster = r.poster || r.posters || {};
     const ep = item?.published_release_episode || {};
     const image = extractPosterUrl(poster);
-    let weekday = parseWeekday(r.publish_day || item?.publish_day);
+    let weekday = parseWeekday(item?.publish_day?.value ?? r?.publish_day?.value ?? r?.publish_day);
     if (weekday === null && r.time) {
       const date = new Date(r.time);
       if (!isNaN(date.getTime())) weekday = (date.getDay() + 6) % 7;
