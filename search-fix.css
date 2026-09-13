@@ -1,0 +1,3 @@
+#results{position:relative!important;display:grid;clear:both;width:100%;height:auto!important;min-height:0;overflow:visible;margin-bottom:28px;z-index:1}
+#results .anime-card{position:relative;z-index:1}
+.popular-search{position:relative;clear:both;z-index:0}
