@@ -1,5 +1,15 @@
 const TOP_API='https://anime-space-rust.vercel.app/api/anime';
 
+function topEsc(value){
+  return String(value??'').replace(/[&<>\"']/g,c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function topPackAnime(item){
+  try{return encodeURIComponent(JSON.stringify(item)).replace(/'/g,'%27')}catch{return ''}
+}
+
 async function loadTopCategory(category){
   const grid=document.getElementById('topGrid');
   const podium=document.getElementById('podium');
@@ -9,58 +19,54 @@ async function loadTopCategory(category){
   podium.innerHTML='';
 
   try{
-    const pages=[];
+    const items=[];
 
     for(let page=1;page<=2;page++){
-      const url=TOP_API+'?type=top&category='+encodeURIComponent(category)+'&page='+page+'&limit=50';
+      const url=TOP_API+'?type=top&category='+encodeURIComponent(category)+'&page='+page+'&limit=50&_='+Date.now();
       const response=await fetch(url,{cache:'no-store'});
 
       if(!response.ok){
-        let details='';
-        try{
-          const data=await response.json();
-          details=data?.error||'';
-        }catch{}
-        throw new Error('Top API: '+response.status+(details?' — '+details:''));
+        let message='';
+        try{const data=await response.json();message=data?.error||''}catch{}
+        throw new Error('Top API: '+response.status+(message?' — '+message:''));
       }
 
       const data=await response.json();
-      if(!Array.isArray(data))break;
+      if(!Array.isArray(data))throw new Error('Top API вернул не массив');
 
-      pages.push(...data);
+      items.push(...data);
       if(data.length<50)break;
-      if(page<2)await new Promise(resolve=>setTimeout(resolve,300));
     }
 
-    const list=pages.slice(0,100);
+    const list=items.slice(0,100).filter(item=>item&&typeof item==='object');
 
-    const make=(item,i)=>{
-      const imageUrl=typeof item.image==='string'?item.image:'';
+    const makeCard=(item,rank)=>{
+      const imageUrl=item.image||'';
       const titleText=typeof item.title==='string'
         ?item.title
         :(item.title?.userPreferred||item.title?.romaji||item.title?.english||'Без названия');
       const ratingVal=item.rating||'—';
 
-      return `<article class="top-card" data-anime='${packAnime(item)}'>
-        <img src="${esc(imageUrl)}" alt="${esc(titleText)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+      return `<article class="top-card" data-anime="${topPackAnime(item)}">
+        <img src="${topEsc(imageUrl)}" alt="${topEsc(titleText)}" loading="lazy" referrerpolicy="no-referrer">
         <div class="top-info">
-          <div class="top-rank">#${i}</div>
-          <div class="top-name">${esc(titleText)}</div>
-          <div class="top-rating">★ ${esc(String(ratingVal))}</div>
-          <div class="top-meta">${item.year||'—'} • ${esc(item.type||'Аниме')}${item.episodes?' • '+esc(String(item.episodes))+' сер.':''}</div>
+          <div class="top-rank">#${rank}</div>
+          <div class="top-name">${topEsc(titleText)}</div>
+          <div class="top-rating">★ ${topEsc(ratingVal)}</div>
+          <div class="top-meta">${topEsc(item.year||'—')} • ${topEsc(item.type||'Аниме')}${item.episodes?' • '+topEsc(item.episodes)+' сер.':''}</div>
         </div>
       </article>`;
     };
 
-    podium.innerHTML=list.slice(0,3).map((item,i)=>make(item,i+1)).join('');
-    grid.innerHTML=list.slice(3).map((item,i)=>make(item,i+4)).join('');
+    podium.innerHTML=list.slice(0,3).map((item,index)=>makeCard(item,index+1)).join('');
+    grid.innerHTML=list.slice(3).map((item,index)=>makeCard(item,index+4)).join('');
 
     if(!list.length){
       podium.innerHTML='';
       grid.innerHTML='<div class="top-loading">Ничего не найдено</div>';
     }
-  }catch(e){
-    console.error('AnimeSpace top category error:',e);
+  }catch(error){
+    console.error('AnimeSpace Top 100 error:',error);
     podium.innerHTML='';
     grid.innerHTML='<div class="top-loading">Не удалось загрузить топ</div>';
   }
@@ -70,8 +76,7 @@ document.querySelectorAll('.top-tab').forEach((button,index)=>{
   button.addEventListener('click',()=>{
     document.querySelectorAll('.top-tab').forEach(x=>x.classList.remove('active'));
     button.classList.add('active');
-    const categories=['overall','year','season','popular'];
-    loadTopCategory(categories[index]);
+    loadTopCategory(['overall','year','season','popular'][index]);
   });
 });
 
