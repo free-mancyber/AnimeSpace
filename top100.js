@@ -11,7 +11,7 @@ async function loadTopCategory(category){
   try{
     const pages=[];
     for(let page=1;page<=2;page++){
-      const url=TOP_API+'?type=top&category='+encodeURIComponent(category)+'&page='+page+'&limit=50&_='+Date.now();
+      const url=TOP_API+'?type=top&category='+encodeURIComponent(category)+'&page='+page+'&limit=50';
       const response=await fetch(url,{cache:'no-store'});
       if(!response.ok){
         let details='';
@@ -22,6 +22,7 @@ async function loadTopCategory(category){
       if(!Array.isArray(data))break;
       pages.push(...data);
       if(data.length<50)break;
+      if(page<2) await new Promise(resolve=>setTimeout(resolve,300));
     }
 
     const list=pages.map(normalizeAnime).filter(Boolean).slice(0,100);
