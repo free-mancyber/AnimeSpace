@@ -114,11 +114,13 @@ async function anilibriaSchedule() {
       const date = new Date(r.time);
       if (!isNaN(date.getTime())) weekday = (date.getDay() + 6) % 7;
     }
+    const rawRating = r.rating?.score ?? r.rating ?? r.average_score;
+    const rating = typeof rawRating === 'number' ? rawRating : (typeof rawRating === 'string' && rawRating.trim() ? rawRating : '—');
     return {
       id: r.id,
       title: r.name?.main || r.name?.english || r.name?.alternative || 'Без названия',
       image,
-      rating: r.rating?.score ?? r.rating ?? r.average_score ?? '—',
+      rating,
       year: r.year || null,
       episodes: r.episodes_total || 0,
       status: r.is_ongoing ? 'Выходит' : 'Вышел',
