@@ -1,10 +1,4 @@
-function getCurrentSeason(){
-  const month=new Date().getMonth()+1;
-  if(month<=3)return'WINTER';
-  if(month<=6)return'SPRING';
-  if(month<=9)return'SUMMER';
-  return'FALL';
-}
+const TOP_API='https://anime-space-rust.vercel.app/api/anime';
 
 async function loadTopCategory(category){
   const grid=document.getElementById('topGrid');
@@ -15,33 +9,22 @@ async function loadTopCategory(category){
   podium.innerHTML='';
 
   try{
-    let filter='';
-    let variableDefs='$page:Int,$perPage:Int,$sort:[MediaSort]';
-    const variables={perPage:50,sort:['SCORE_DESC']};
-
-    if(category==='year'){
-      filter=',startDate_greater:$from,startDate_lesser:$to';
-      variableDefs+=',$from:FuzzyDateInt,$to:FuzzyDateInt';
-      const year=new Date().getFullYear();
-      variables.from=year*10000+101;
-      variables.to=year*10000+1231;
+    const pages=[];
+    for(let page=1;page<=2;page++){
+      const url=TOP_API+'?type=top&category='+encodeURIComponent(category)+'&page='+page+'&limit=50&_='+Date.now();
+      const response=await fetch(url,{cache:'no-store'});
+      if(!response.ok){
+        let details='';
+        try{const data=await response.json();details=data?.error||''}catch{}
+        throw new Error('Top API: '+response.status+(details?' — '+details:''));
+      }
+      const data=await response.json();
+      if(!Array.isArray(data))break;
+      pages.push(...data);
+      if(data.length<50)break;
     }
 
-    if(category==='season'){
-      filter=',season:$season,seasonYear:$seasonYear';
-      variableDefs+=',$season:MediaSeason,$seasonYear:Int';
-      variables.season=getCurrentSeason();
-      variables.seasonYear=new Date().getFullYear();
-    }
-
-    if(category==='popular')variables.sort=['POPULARITY_DESC'];
-
-    const query=`query(${variableDefs}){Page(page:$page,perPage:$perPage){media(type:ANIME,isAdult:false,sort:$sort${filter}){${MEDIA_FIELDS}}}}`;
-
-    const first=await aniList(query,{...variables,page:1});
-    const second=await aniList(query,{...variables,page:2});
-    const list=[...(first.Page?.media||[]),...(second.Page?.media||[])].map(normalizeAnime).filter(Boolean).slice(0,100);
-
+    const list=pages.map(normalizeAnime).filter(Boolean).slice(0,100);
     const make=(a,i)=>`<article class="top-card" data-anime='${packAnime(a)}'><img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy"><div class="top-info"><div class="top-rank">#${i}</div><div class="top-name">${esc(a.title)}</div><div class="top-rating">★ ${esc(a.rating)}</div><div class="top-meta">${a.episodes||'—'} эпизода · ${esc(a.status||'—')}</div></div></article>`;
 
     podium.innerHTML=list.slice(0,3).map((a,i)=>make(a,i+1)).join('');
