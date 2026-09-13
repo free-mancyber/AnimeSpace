@@ -118,7 +118,7 @@ async function anilibriaSchedule() {
       id: r.id,
       title: r.name?.main || r.name?.english || r.name?.alternative || 'Без названия',
       image,
-      rating: '—',
+      rating: r.rating?.score ?? r.rating ?? r.average_score ?? '—',
       year: r.year || null,
       episodes: r.episodes_total || 0,
       status: r.is_ongoing ? 'Выходит' : 'Вышел',
