@@ -31,6 +31,17 @@ async function anilist(query, variables = {}) {
   return data.data;
 }
 
+async function getAniListRating(title) {
+  if (!title) return '—';
+  try {
+    const data = await anilist(`query($search:String){Page(page:1,perPage:1){media(type:ANIME,search:$search,isAdult:false){averageScore}}}`, { search: String(title) });
+    const score = data?.Page?.media?.[0]?.averageScore;
+    return Number.isFinite(score) ? (score / 10).toFixed(1) : '—';
+  } catch (_) {
+    return '—';
+  }
+}
+
 function parseWeekday(rawDay) {
   let dayVal = (rawDay && typeof rawDay === 'object' && 'value' in rawDay) ? rawDay.value : rawDay;
   if (dayVal === null || dayVal === undefined) return null;
@@ -104,7 +115,7 @@ async function fetchWithFallback(endpointPath) {
 async function anilibriaSchedule() {
   const data = await fetchWithFallback('/anime/schedule/week');
   const rawList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
-  return rawList.map(item => {
+  const list = rawList.map(item => {
     const r = item?.release || item || {};
     const poster = r.poster || r.posters || {};
     const ep = item?.published_release_episode || {};
@@ -114,13 +125,11 @@ async function anilibriaSchedule() {
       const date = new Date(r.time);
       if (!isNaN(date.getTime())) weekday = (date.getDay() + 6) % 7;
     }
-    const rawRating = r.rating?.score ?? r.rating ?? r.average_score;
-    const rating = typeof rawRating === 'number' ? rawRating : (typeof rawRating === 'string' && rawRating.trim() ? rawRating : '—');
     return {
       id: r.id,
       title: r.name?.main || r.name?.english || r.name?.alternative || 'Без названия',
       image,
-      rating,
+      rating: '—',
       year: r.year || null,
       episodes: r.episodes_total || 0,
       status: r.is_ongoing ? 'Выходит' : 'Вышел',
@@ -133,6 +142,9 @@ async function anilibriaSchedule() {
       source: 'aniliberty'
     };
   }).filter(x => x.id);
+
+  const rated = await Promise.all(list.map(async anime => ({ ...anime, rating: await getAniListRating(anime.title) })));
+  return rated;
 }
 
 const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType,$from:FuzzyDateInt,$to:FuzzyDateInt,$season:MediaSeason,$seasonYear:Int){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort,startDate_greater:$from,startDate_lesser:$to,season:$season,seasonYear:$seasonYear){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration genres startDate{year} seasonYear description}}}`;
