@@ -147,6 +147,7 @@ async function anilibriaSchedule() {
 }
 
 const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType,$genre_in:[String],$format:MediaFormat,$from:FuzzyDateInt,$to:FuzzyDateInt,$minScore:Int){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort,genre_in:$genre_in,format:$format,startDate_greater:$from,startDate_lesser:$to,averageScore_greater:$minScore,isAdult:false){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration format genres startDate{year} seasonYear description}}}`;
+const ANILIST_TOP_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$season:MediaSeason,$seasonYear:Int,$from:FuzzyDateInt,$to:FuzzyDateInt){Page(page:$page,perPage:$perPage){media(type:ANIME,sort:$sort,season:$season,seasonYear:$seasonYear,startDate_greater:$from,startDate_lesser:$to,isAdult:false){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration format genres startDate{year} seasonYear description}}}`;
 const ANILIST_DETAILS_QUERY = `query($id:Int){Media(id:$id,type:ANIME){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration format genres startDate{year} seasonYear description}}`;
 
 async function anilistList({ page = 1, limit = 20, order = 'ranked', search, category = 'overall', genres = [], year, rating, type } = {}) {
@@ -161,12 +162,25 @@ async function anilistList({ page = 1, limit = 20, order = 'ranked', search, cat
   if (category === 'year' && !year) {
     const y = new Date().getFullYear(); variables.from = y * 10000 + 101; variables.to = y * 10000 + 1231;
   }
+  const data = await anilist(ANILIST_LIST_QUERY, variables);
+  return (data.Page?.media || []).map(normalizeAniList).filter(Boolean);
+}
+
+async function anilistTopList({ page = 1, limit = 20, category = 'overall' } = {}) {
+  let sort = ['SCORE_DESC'];
+  if (category === 'popular') sort = ['POPULARITY_DESC'];
+  const variables = { page: Number(page) || 1, perPage: Math.min(Number(limit) || 20, 50), sort };
+  if (category === 'year') {
+    const y = new Date().getFullYear();
+    variables.from = y * 10000 + 101;
+    variables.to = y * 10000 + 1231;
+  }
   if (category === 'season') {
     const month = new Date().getMonth() + 1;
     variables.season = month <= 3 ? 'WINTER' : month <= 6 ? 'SPRING' : month <= 9 ? 'SUMMER' : 'FALL';
     variables.seasonYear = new Date().getFullYear();
   }
-  const data = await anilist(ANILIST_LIST_QUERY, variables);
+  const data = await anilist(ANILIST_TOP_QUERY, variables);
   return (data.Page?.media || []).map(normalizeAniList).filter(Boolean);
 }
 
@@ -196,7 +210,7 @@ async function getTopCached(category, page, limit) {
   const key = `top:${category}:${page}:${limit}`;
   const cached = topCache.get(key);
   if (cached && cached.expires > Date.now()) return cached.data;
-  const data = await anilistList({ limit, page, order: category === 'popular' ? 'popularity' : 'ranked', category });
+  const data = await anilistTopList({ limit, page, category });
   topCache.set(key, { data, expires: Date.now() + 60_000 });
   return data;
 }
