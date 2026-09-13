@@ -3,7 +3,7 @@ const ANILIBRIA_API = 'https://anilibria.top/api/v1';
 
 const topCache = new Map();
 const GENRE_MAP = {
-  'Экшен':'Action','Приключения':'Adventure','Комедия':'Comedy','Драма':'Drama','Фэнтези':'Fantasy','Мистика':'Supernatural','Романтика':'Romance','Фантастика':'Sci-Fi','Повседневность':'Slice of Life','Детектив':'Mystery','Ужасы':'Horror','Спорт':'Sports','Меха':'Mecha','Музыка':'Music','Школа':'School','Самураи':'Samurai','Демоны':'Demons','Магия':'Magic','Триллер':'Thriller','Сёнэн':'Shounen','Исекай':'Isekai'
+  'Экшен':'Action','Приключения':'Adventure','Комедия':'Comedy','Драма':'Drama','Фэнтези':'Fantasy','Мистика':'Supernatural','Романтика':'Romance','Фантастика':'Sci-Fi','Повседневность':'Slice of Life','Детектив':'Mystery','Ужасы':'Horror','Спорт':'Sports','Меха':'Mecha','Музыка':'Music','Школа':'School','Самураи':'Samurai','Демоны':'Demons','Магия':'Magic','Триллер':'Thriller','Сёнэн':'Shounen','Исекай':'Isekai','Сверхъестественное':'Supernatural'
 };
 const TYPE_MAP = {'Сериал':'TV','Фильм':'MOVIE','OVA':'OVA','ONA':'ONA'};
 
@@ -98,16 +98,7 @@ function extractPosterUrl(poster) {
 }
 
 function extractAniLibertyRating(r) {
-  const candidates = [
-    r?.rating?.average,
-    r?.rating?.score,
-    r?.rating?.value,
-    r?.rating,
-    r?.average_rating,
-    r?.average_score,
-    r?.averageScore,
-    r?.score
-  ];
+  const candidates = [r?.rating?.average,r?.rating?.score,r?.rating?.value,r?.rating,r?.average_rating,r?.average_score,r?.averageScore,r?.score];
   for (const candidate of candidates) {
     const n = Number(candidate);
     if (!Number.isFinite(n) || n <= 0) continue;
@@ -171,11 +162,23 @@ const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$sear
 const ANILIST_TOP_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$season:MediaSeason,$seasonYear:Int,$from:FuzzyDateInt,$to:FuzzyDateInt){Page(page:$page,perPage:$perPage){media(type:ANIME,sort:$sort,season:$season,seasonYear:$seasonYear,startDate_greater:$from,startDate_lesser:$to,isAdult:false){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration format genres startDate{year} seasonYear description}}}`;
 const ANILIST_DETAILS_QUERY = `query($id:Int){Media(id:$id,type:ANIME){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration format genres startDate{year} seasonYear description}}`;
 
+function normalizeGenres(raw) {
+  if (raw == null) return [];
+  let value = String(raw);
+  try { value = decodeURIComponent(value); } catch (_) {}
+  return value.split(',').map(g => {
+    const clean = String(g).trim();
+    if (!clean) return '';
+    return GENRE_MAP[clean.toLowerCase()] || clean;
+  }).filter(Boolean);
+}
+
 async function anilistList({ page = 1, limit = 20, order = 'ranked', search, category = 'overall', genres = [], year, rating, type } = {}) {
   let sort = ['SCORE_DESC'];
   if (order === 'popularity') sort = ['POPULARITY_DESC'];
   if (order === 'aired_on') sort = ['START_DATE_DESC'];
-  const variables = { page: Number(page) || 1, perPage: Math.min(Number(limit) || 20, 50), sort, search: search || undefined, type: 'ANIME', genre_in: genres.map(g => GENRE_MAP[g] || g).filter(Boolean), format: TYPE_MAP[type] || undefined, minScore: rating != null && rating !== '' ? Math.round(Number(rating) * 10) : undefined };
+  const normalizedGenres = (Array.isArray(genres) ? genres : [genres]).flatMap(normalizeGenres);
+  const variables = { page: Number(page) || 1, perPage: Math.min(Number(limit) || 20, 50), sort, search: search || undefined, type: 'ANIME', genre_in: normalizedGenres, format: TYPE_MAP[type] || undefined, minScore: rating != null && rating !== '' ? Math.round(Number(rating) * 10) : undefined };
   if (year) {
     const y = Number(year);
     if (y >= 1900 && y <= 2100) { variables.from = y * 10000 + 101; variables.to = y * 10000 + 1231; }
@@ -206,24 +209,25 @@ async function anilistTopList({ page = 1, limit = 20, category = 'overall' } = {
 }
 
 async function searchWithFallback(query, limit, filters = {}) {
+  const normalizedFilters = { ...filters, genres: normalizeGenres(filters.genres) };
   let aniListResults = [];
   try {
-    aniListResults = await anilistList({ limit, page: 1, order: 'ranked', search: query || undefined, genres: filters.genres || [], year: filters.year, rating: filters.rating, type: filters.type });
+    aniListResults = await anilistList({ limit, page: 1, order: 'ranked', search: query || undefined, genres: normalizedFilters.genres, year: normalizedFilters.year, rating: normalizedFilters.rating, type: normalizedFilters.type });
   } catch (error) {
     console.warn('AniList search failed, switching to AniLiberty:', error.message);
   }
   if (aniListResults.length) return aniListResults;
   try {
     let aniLibertyResults = await anilibriaSearch(query || '');
-    const genres = filters.genres || [];
-    if (genres.length) aniLibertyResults = aniLibertyResults.filter(a => genres.every(g => a.genres.includes(g)));
-    if (filters.year) aniLibertyResults = aniLibertyResults.filter(a => String(a.year) === String(filters.year));
-    if (filters.rating) aniLibertyResults = aniLibertyResults.filter(a => Number(a.rating) >= Number(filters.rating));
-    if (filters.type) aniLibertyResults = aniLibertyResults.filter(a => String(a.type).toLowerCase().includes(String(filters.type).toLowerCase()));
+    const genres = normalizedFilters.genres || [];
+    if (genres.length) aniLibertyResults = aniLibertyResults.filter(a => genres.every(g => a.genres.includes(g) || a.genres.includes(GENRE_MAP[g?.toLowerCase()] || g)));
+    if (normalizedFilters.year) aniLibertyResults = aniLibertyResults.filter(a => String(a.year) === String(normalizedFilters.year));
+    if (normalizedFilters.rating) aniLibertyResults = aniLibertyResults.filter(a => Number(a.rating) >= Number(normalizedFilters.rating));
+    if (normalizedFilters.type) aniLibertyResults = aniLibertyResults.filter(a => String(a.type).toLowerCase().includes(String(normalizedFilters.type).toLowerCase()));
     return aniLibertyResults.slice(0, limit);
   } catch (error) {
     console.warn('AniLiberty search failed:', error.message);
-    throw error;
+    return [];
   }
 }
 
@@ -242,7 +246,9 @@ module.exports = async (req, res) => {
   try {
     const { type, id, q, page = 1, limit = 20, category = 'overall' } = req.query;
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
-    if (type === 'search') return json(res, 200, await searchWithFallback(q || '', safeLimit, req.query), 0);
+    if (type === 'search') {
+      return json(res, 200, await searchWithFallback(q || '', safeLimit, req.query), 0);
+    }
     if (type === 'top') return json(res, 200, await getTopCached(category, Number(page) || 1, safeLimit), 60);
     if (type === 'details' && id) {
       if (String(id).startsWith('anilibria-')) {
@@ -257,6 +263,7 @@ module.exports = async (req, res) => {
     return json(res, 400, { error: 'Invalid request' }, 0);
   } catch (error) {
     console.error('Anime API error:', error);
+    if (req.query?.type === 'search') return json(res, 200, [], 0);
     return json(res, error.status || 500, { error: error.message || 'Internal server error' }, 0);
   }
 };
