@@ -28,9 +28,11 @@ async function loadTopCategory(category){
     const list=pages.map(normalizeAnime).filter(Boolean).slice(0,100);
 
     const make=(a,i)=>{
-      const image=a.image||'';
+      const original=a.image||'';
+      const fallback=a.id?'https://img.anili.st/media/'+encodeURIComponent(String(a.id)):'';
+      const first=fallback||original;
       return `<article class="top-card" data-anime='${packAnime(a)}'>
-        <img src="${esc(image)}" alt="${esc(a.title||'Аниме')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+        <img src="${esc(first)}" alt="${esc(a.title||'Аниме')}" loading="lazy" referrerpolicy="no-referrer" data-original-poster="${esc(original)}" onerror="if(this.dataset.originalPoster&&this.src!==this.dataset.originalPoster){this.src=this.dataset.originalPoster}else{this.style.display='none'}">
         <div class="top-info">
           <div class="top-rank">#${i}</div>
           <div class="top-name">${esc(a.title||'Без названия')}</div>
