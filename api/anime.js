@@ -23,7 +23,7 @@ function normalizeAniList(a) {
   if (!a) return null;
   const year = a.seasonYear || (a.startDate?.year ?? null);
   const statusMap = { FINISHED: 'released', RELEASING: 'ongoing', NOT_YET_RELEASED: 'anons', CANCELLED: 'cancelled', HIATUS: 'paused' };
-  return { id: a.id, title: a.title?.native || a.title?.romaji || a.title?.english || 'Без названия', originalTitle: a.title?.romaji || a.title?.english || '', image: a.coverImage?.extraLarge || a.coverImage?.large || a.coverImage?.medium || '', rating: a.averageScore ? (a.averageScore / 10).toFixed(1) : '—', year, episodes: a.episodes || 0, status: statusMap[a.status] || String(a.status || '').toLowerCase(), duration: a.duration || 0, genres: a.genres || [], description: a.description || '' };
+  return { id: a.id, title: a.title?.native || a.title?.romaji || a.title?.english || 'Без названия', originalTitle: a.title?.romaji || a.title?.english || '', image: a.coverImage?.extraLarge || a.coverImage?.large || a.coverImage?.medium || '', rating: a.averageScore ? (a.averageScore / 10).toFixed(1) : '—', year, episodes: a.episodes || 0, status: statusMap[a.status] || String(a.status || '').toLowerCase(), duration: a.duration || 0, genres: a.genres || [], description: a.description || '', source: 'anilist' };
 }
 
 async function sleep(ms) {
@@ -110,6 +110,38 @@ async function fetchWithFallback(endpointPath) {
   throw lastError || new Error('All AniLiberty mirrors failed');
 }
 
+function normalizeAniLibertyRelease(item) {
+  const r = item?.release || item || {};
+  const name = r.name || {};
+  const poster = extractPosterUrl(r.poster || r.posters || {});
+  if (!r.id || !poster) return null;
+  const type = r.type?.description || r.type?.value || 'Аниме';
+  return {
+    id: `anilibria-${r.id}`,
+    anilibriaId: r.id,
+    title: name.main || name.english || name.alternative || 'Без названия',
+    originalTitle: name.english || name.main || '',
+    image: poster,
+    rating: '—',
+    votes: null,
+    year: r.year || null,
+    episodes: r.episodes_total || 0,
+    status: r.is_ongoing ? 'ongoing' : 'released',
+    duration: r.average_duration_of_episode || 0,
+    type,
+    genres: Array.isArray(r.genres) ? r.genres.map(g => g?.description || g?.name || g).filter(Boolean) : [],
+    description: r.description || '',
+    source: 'anilibria'
+  };
+}
+
+async function anilibriaSearch(query) {
+  const encoded = encodeURIComponent(String(query).trim());
+  const data = await fetchWithFallback(`/app/search/releases?query=${encoded}`);
+  const rawList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+  return rawList.map(normalizeAniLibertyRelease).filter(Boolean);
+}
+
 async function anilibriaSchedule() {
   const data = await fetchWithFallback('/anime/schedule/week');
   const rawList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
@@ -164,6 +196,24 @@ async function anilistList({ page = 1, limit = 20, order = 'ranked', search, cat
   return (data.Page?.media || []).map(normalizeAniList).filter(Boolean);
 }
 
+async function searchWithFallback(query, limit) {
+  let aniListResults = [];
+  try {
+    aniListResults = await anilistList({ limit, page: 1, order: 'ranked', search: query });
+  } catch (error) {
+    console.warn('AniList search failed, switching to AniLiberty:', error.message);
+  }
+  if (aniListResults.length) return aniListResults;
+  try {
+    const aniLibertyResults = await anilibriaSearch(query);
+    return aniLibertyResults.slice(0, limit);
+  } catch (error) {
+    console.warn('AniLiberty search failed:', error.message);
+    if (aniListResults.length) return aniListResults;
+    throw error;
+  }
+}
+
 async function getTopCached(category, page, limit) {
   const key = `top:${category}:${page}:${limit}`;
   const cached = topCache.get(key);
@@ -184,7 +234,7 @@ module.exports = async (req, res) => {
     if (type === 'new') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'aired_on' }));
     if (type === 'search') {
       if (!q || String(q).trim().length < 2) return json(res, 400, { error: 'Search query is too short' }, 0);
-      return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'ranked', search: String(q).trim() }), 30);
+      return json(res, 200, await searchWithFallback(String(q).trim(), safeLimit), 30);
     }
     if (type === 'schedule') return json(res, 200, await anilibriaSchedule(), 0);
     if (type === 'details') {
