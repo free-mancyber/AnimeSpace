@@ -97,6 +97,26 @@ function extractPosterUrl(poster) {
   return fixPosterUrl(rawUrl);
 }
 
+function extractAniLibertyRating(r) {
+  const candidates = [
+    r?.rating?.average,
+    r?.rating?.score,
+    r?.rating?.value,
+    r?.rating,
+    r?.average_rating,
+    r?.average_score,
+    r?.averageScore,
+    r?.score
+  ];
+  for (const candidate of candidates) {
+    const n = Number(candidate);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    const normalized = n > 10 ? n / 10 : n;
+    if (normalized >= 0 && normalized <= 10) return normalized.toFixed(1);
+  }
+  return '—';
+}
+
 async function fetchWithFallback(endpointPath) {
   const baseUrls = [ANILIBRIA_API, 'https://api.anilibria.app/api/v1'];
   let lastError = null;
@@ -120,7 +140,7 @@ function normalizeAniLibertyRelease(item) {
   const poster = extractPosterUrl(r.poster || r.posters || {});
   if (!r.id || !poster) return null;
   const type = r.type?.description || r.type?.value || 'Аниме';
-  return { id: `anilibria-${r.id}`, anilibriaId: r.id, title: name.main || name.english || name.alternative || 'Без названия', originalTitle: name.english || name.main || '', image: poster, rating: '—', votes: null, year: r.year || null, episodes: r.episodes_total || 0, status: r.is_ongoing ? 'ongoing' : 'released', duration: r.average_duration_of_episode || 0, type, genres: Array.isArray(r.genres) ? r.genres.map(g => g?.description || g?.name || g).filter(Boolean) : [], description: r.description || '', source: 'anilibria' };
+  return { id: `anilibria-${r.id}`, anilibriaId: r.id, title: name.main || name.english || name.alternative || 'Без названия', originalTitle: name.english || name.main || '', image: poster, rating: extractAniLibertyRating(r), votes: null, year: r.year || null, episodes: r.episodes_total || 0, status: r.is_ongoing ? 'ongoing' : 'released', duration: r.average_duration_of_episode || 0, type, genres: Array.isArray(r.genres) ? r.genres.map(g => g?.description || g?.name || g).filter(Boolean) : [], description: r.description || '', source: 'anilibria' };
 }
 
 async function anilibriaSearch(query) {
@@ -143,7 +163,7 @@ async function anilibriaSchedule() {
       const date = new Date(r.time);
       if (!isNaN(date.getTime())) weekday = (date.getDay() + 6) % 7;
     }
-    return { id: r.id, title: r.name?.main || r.name?.english || r.name?.alternative || 'Без названия', image, rating: '—', year: r.year || null, episodes: r.episodes_total || 0, status: r.is_ongoing ? 'Выходит' : 'Вышел', duration: r.average_duration_of_episode || 0, genres: [], description: r.description || '', episode: ep.ordinal ?? item?.next_release_episode_number ?? null, time: ep.updated_at || null, weekday, source: 'anilibria' };
+    return { id: r.id, title: r.name?.main || r.name?.english || r.name?.alternative || 'Без названия', image, rating: extractAniLibertyRating(r), year: r.year || null, episodes: r.episodes_total || 0, status: r.is_ongoing ? 'Выходит' : 'Вышел', duration: r.average_duration_of_episode || 0, genres: [], description: r.description || '', episode: ep.ordinal ?? item?.next_release_episode_number ?? null, time: ep.updated_at || null, weekday, source: 'anilibria' };
   }).filter(x => x.id && x.image && x.title);
 }
 
@@ -222,15 +242,21 @@ module.exports = async (req, res) => {
   try {
     const { type, id, q, page = 1, limit = 20, category = 'overall' } = req.query;
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
-    if (type === 'popular') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'popularity' }), 60);
-    if (type === 'new') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'aired_on' }), 60);
-    if (type === 'top') return json(res, 200, await getTopCached(category, page, safeLimit), 60);
-    if (type === 'details' && id) return json(res, 200, await anilist(ANILIST_DETAILS_QUERY, { id: Number(id) }).then(data => normalizeAniList(data.Media)), 60);
-    if (type === 'search') return json(res, 200, await searchWithFallback(q || '', safeLimit, { genres: String(req.query.genres || '').split(',').map(decodeURIComponent).filter(Boolean), year: req.query.year, rating: req.query.rating, type: req.query.format }), 0);
+    if (type === 'search') return json(res, 200, await searchWithFallback(q || '', safeLimit, req.query), 0);
+    if (type === 'top') return json(res, 200, await getTopCached(category, Number(page) || 1, safeLimit), 60);
+    if (type === 'details' && id) {
+      if (String(id).startsWith('anilibria-')) {
+        const releaseId = String(id).replace('anilibria-', '');
+        const data = await fetchWithFallback(`/anime/releases/${encodeURIComponent(releaseId)}`);
+        return json(res, 200, normalizeAniLibertyRelease(data?.data || data), 0);
+      }
+      const data = await anilist(ANILIST_DETAILS_QUERY, { id: Number(id) });
+      return json(res, 200, normalizeAniList(data.Media), 0);
+    }
     if (type === 'schedule') return json(res, 200, await anilibriaSchedule(), 0);
-    return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'ranked', search: q || undefined }), 60);
+    return json(res, 400, { error: 'Invalid request' }, 0);
   } catch (error) {
     console.error('Anime API error:', error);
-    return json(res, error.status && Number.isInteger(error.status) ? error.status : 500, { error: error.message || 'Anime API error', provider: error.data ? 'anilist' : 'anilibria' }, 0);
+    return json(res, error.status || 500, { error: error.message || 'Internal server error' }, 0);
   }
 };
