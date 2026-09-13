@@ -34,9 +34,11 @@ async function anilist(query, variables = {}) {
 async function getAniListRating(title) {
   if (!title) return '—';
   try {
-    const data = await anilist(`query($search:String){Page(page:1,perPage:1){media(type:ANIME,search:$search,isAdult:false){averageScore}}}`, { search: String(title) });
-    const score = data?.Page?.media?.[0]?.averageScore;
-    return Number.isFinite(score) ? (score / 10).toFixed(1) : '—';
+    const query = `query($search:String){Page(page:1,perPage:5){media(type:ANIME,search:$search,isAdult:false,sort:SEARCH_MATCH){title{romaji english native}averageScore}}}`;
+    const data = await anilist(query, { search: String(title).trim() });
+    const media = data?.Page?.media || [];
+    const scored = media.find(item => Number.isFinite(item?.averageScore));
+    return Number.isFinite(scored?.averageScore) ? (scored.averageScore / 10).toFixed(1) : '—';
   } catch (_) {
     return '—';
   }
