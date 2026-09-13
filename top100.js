@@ -19,10 +19,10 @@ async function loadTopCategory(category){
     let variables={page:1,perPage:100,sort:['SCORE_DESC']};
 
     if(category==='year'){
-      filter=',startDateGreater: $from,startDateLesser: $to';
+      filter=',startDateGreater:$from,startDateLesser:$to';
       const year=new Date().getFullYear();
-      variables.from={year,month:1,day:1};
-      variables.to={year,month:12,day:31};
+      variables.from=year*10000+101;
+      variables.to=year*10000+1231;
     }
 
     if(category==='season'){
