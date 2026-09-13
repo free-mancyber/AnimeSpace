@@ -19,7 +19,7 @@ async function loadTopCategory(category){
     let variables={page:1,perPage:100,sort:['SCORE_DESC']};
 
     if(category==='year'){
-      filter=',startDateGreater:$from,startDateLesser:$to';
+      filter=',startDate_greater:$from,startDate_lesser:$to';
       const year=new Date().getFullYear();
       variables.from=year*10000+101;
       variables.to=year*10000+1231;
