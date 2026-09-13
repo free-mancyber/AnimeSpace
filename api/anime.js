@@ -34,11 +34,7 @@ function normalizeAniList(a) {
 async function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 async function anilist(query, variables = {}, attempt = 0) {
-  const response = await fetch(ANILIST_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ query, variables })
-  });
+  const response = await fetch(ANILIST_API, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ query, variables }) });
   let data = null;
   try { data = await response.json(); } catch (_) {}
   if (response.status === 429 && attempt < 2) {
@@ -225,17 +221,17 @@ module.exports = async (req, res) => {
   try {
     const { type, id, q, page = 1, limit = 20, category = 'overall' } = req.query;
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
-    if (type === 'popular') return json(res, await anilistList({ page, limit: safeLimit, order: 'popularity' }), 200, 30);
-    if (type === 'search') return json(res, await searchWithFallback(q || '', safeLimit, { genres: req.query.genres ? String(req.query.genres).split(',').map(x => decodeURIComponent(x)).filter(Boolean) : [], year: req.query.year || '', rating: req.query.rating || '', type: req.query.format || '' }), 200, 0);
-    if (type === 'top') return json(res, await getTopCached(category, Number(page) || 1, safeLimit), 200, 30);
-    if (type === 'schedule') return json(res, await anilibriaSchedule(), 200, 30);
+    if (type === 'popular') return json(res, 200, await anilistList({ page, limit: safeLimit, order: 'popularity' }), 30);
+    if (type === 'search') return json(res, 200, await searchWithFallback(q || '', safeLimit, { genres: req.query.genres ? String(req.query.genres).split(',').map(x => decodeURIComponent(x)).filter(Boolean) : [], year: req.query.year || '', rating: req.query.rating || '', type: req.query.format || '' }), 0);
+    if (type === 'top') return json(res, 200, await getTopCached(category, Number(page) || 1, safeLimit), 30);
+    if (type === 'schedule') return json(res, 200, await anilibriaSchedule(), 30);
     if (type === 'details' && id) {
       const data = await anilist(ANILIST_DETAILS_QUERY, { id: Number(id) });
-      return json(res, normalizeAniList(data.Media), 200, 60);
+      return json(res, 200, normalizeAniList(data.Media), 60);
     }
-    return json(res, await anilistList({ page, limit: safeLimit, order: 'ranked' }), 200, 30);
+    return json(res, 200, await anilistList({ page, limit: safeLimit, order: 'ranked' }), 30);
   } catch (error) {
     console.error('Anime API error:', error);
-    return json(res, error?.status || 500, { error: error?.message || 'API error' }, 0);
+    return json(res, Number.isInteger(error?.status) && error.status >= 100 && error.status <= 599 ? error.status : 500, { error: error?.message || 'API error', details: error?.data?.errors || undefined }, 0);
   }
 };
