@@ -1,6 +1,8 @@
 const ANILIST_API = 'https://graphql.anilist.co';
 const ANILIBRIA_API = 'https://anilibria.top/api/v1';
 
+const topCache = new Map();
+
 function json(res, status, data, cacheSeconds = 60) {
   res.status(status);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -24,10 +26,27 @@ function normalizeAniList(a) {
   return { id: a.id, title: a.title?.native || a.title?.romaji || a.title?.english || 'Без названия', originalTitle: a.title?.romaji || a.title?.english || '', image: a.coverImage?.extraLarge || a.coverImage?.large || a.coverImage?.medium || '', rating: a.averageScore ? (a.averageScore / 10).toFixed(1) : '—', year, episodes: a.episodes || 0, status: statusMap[a.status] || String(a.status || '').toLowerCase(), duration: a.duration || 0, genres: a.genres || [], description: a.description || '' };
 }
 
-async function anilist(query, variables = {}) {
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function anilist(query, variables = {}, attempt = 0) {
   const response = await fetch(ANILIST_API, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ query, variables }) });
-  const data = await response.json();
-  if (!response.ok || data.errors) { const error = new Error('AniList API request failed'); error.status = response.status || 502; error.data = data; throw error; }
+  let data = null;
+  try { data = await response.json(); } catch (_) {}
+
+  if (response.status === 429 && attempt < 2) {
+    const retryAfter = Number(response.headers.get('retry-after')) || 0;
+    await sleep(Math.max(1200, retryAfter * 1000, 1200 * (attempt + 1)));
+    return anilist(query, variables, attempt + 1);
+  }
+
+  if (!response.ok || data?.errors) {
+    const error = new Error('AniList API request failed');
+    error.status = response.status || 502;
+    error.data = data;
+    throw error;
+  }
   return data.data;
 }
 
@@ -145,7 +164,13 @@ async function anilibriaSchedule() {
     };
   }).filter(x => x.id);
 
-  const rated = await Promise.all(list.map(async anime => ({ ...anime, rating: await getAniListRating(anime.title) })));
+  const rated = [];
+  for (let i = 0; i < list.length; i += 4) {
+    const batch = list.slice(i, i + 4);
+    const results = await Promise.all(batch.map(async anime => ({ ...anime, rating: await getAniListRating(anime.title) })));
+    rated.push(...results);
+    if (i + 4 < list.length) await sleep(150);
+  }
   return rated;
 }
 
@@ -171,6 +196,15 @@ async function anilistList({ page = 1, limit = 20, order = 'ranked', search, cat
   return (data.Page?.media || []).map(normalizeAniList).filter(Boolean);
 }
 
+async function getTopCached(category, page, limit) {
+  const key = `top:${category}:${page}:${limit}`;
+  const cached = topCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.data;
+  const data = await anilistList({ limit, page, order: category === 'popular' ? 'popularity' : 'ranked', category });
+  topCache.set(key, { data, expires: Date.now() + 60_000 });
+  return data;
+}
+
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return json(res, 204, null, 0);
   if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' }, 0);
@@ -178,7 +212,7 @@ module.exports = async (req, res) => {
     const { type, id, q, page = 1, limit = 20, category = 'overall' } = req.query;
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
     if (type === 'popular') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'popularity' }));
-    if (type === 'top') return json(res, 200, await anilistList({ limit: safeLimit, page, order: category === 'popular' ? 'popularity' : 'ranked', category }), 0);
+    if (type === 'top') return json(res, 200, await getTopCached(category, page, safeLimit), 60);
     if (type === 'new') return json(res, 200, await anilistList({ limit: safeLimit, page, order: 'aired_on' }));
     if (type === 'search') {
       if (!q || String(q).trim().length < 2) return json(res, 400, { error: 'Search query is too short' }, 0);
