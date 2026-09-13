@@ -25,7 +25,7 @@ async function loadTopCategory(category){
     }
 
     const list=pages.map(normalizeAnime).filter(Boolean).slice(0,100);
-    const make=(a,i)=>`<article class="top-card" data-anime='${packAnime(a)}'><img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy"><div class="top-info"><div class="top-rank">#${i}</div><div class="top-name">${esc(a.title)}</div><div class="top-rating">★ ${esc(a.rating)}</div><div class="top-meta">${a.episodes||'—'} эпизода · ${esc(a.status||'—')}</div></div></article>`;
+    const make=(a,i)=>`<article class="anime-card top-anime-card" data-anime='${packAnime(a)}'><div class="anime-card-poster"><img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy"><div class="anime-card-rating"><span class="anime-card-rank">#${i}</span><span class="anime-card-star">★</span><span class="anime-card-rating-value">${esc(a.rating||'—')}</span></div></div><div class="anime-card-title">${esc(a.title)}</div><div class="anime-card-meta">${a.year||'—'} • ${esc(a.type||'—')}</div></article>`;
 
     podium.innerHTML=list.slice(0,3).map((a,i)=>make(a,i+1)).join('');
     grid.innerHTML=list.slice(3).map((a,i)=>make(a,i+4)).join('');
