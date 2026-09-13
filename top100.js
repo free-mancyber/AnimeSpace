@@ -52,20 +52,26 @@ async function loadTopCategory(category){
         ?item.title
         :(item.title?.userPreferred||item.title?.romaji||item.title?.english||item.title?.native||'Без названия');
       const ratingVal=item.rating||'—';
+      const votes=item.votes?String(item.votes):'';
+      const type=item.type||'Аниме';
       const packed=topPackAnime({...item,image:imageUrl});
       const fallback=imageUrl&&item?.id?`https://img.anili.st/media/${encodeURIComponent(item.id)}`:'';
       const onError=fallback&&fallback!==imageUrl
         ?`this.onerror=null;this.src='${topEsc(fallback)}'`
         :`this.onerror=null;this.style.visibility='hidden'`;
 
-      return `<article class="top-card" data-anime="${packed}">
-        <img src="${topEsc(imageUrl)}" alt="${topEsc(titleText)}" loading="lazy" referrerpolicy="no-referrer" onerror="${onError}">
-        <div class="top-info">
-          <div class="top-rank">#${rank}</div>
-          <div class="top-name">${topEsc(titleText)}</div>
-          <div class="top-rating">★ ${topEsc(ratingVal)}</div>
-          <div class="top-meta">${topEsc(item.year||'—')} • ${topEsc(item.type||'Аниме')}${item.episodes?' • '+topEsc(item.episodes)+' сер.':''}</div>
+      return `<article class="anime-card top-card" data-anime="${packed}">
+        <div class="anime-card-poster">
+          <img src="${topEsc(imageUrl)}" alt="${topEsc(titleText)}" loading="lazy" referrerpolicy="no-referrer" onerror="${onError}">
+          <div class="anime-card-rating">
+            <span class="anime-card-rank">#${rank}</span>
+            <span class="anime-card-star">★</span>
+            <span class="anime-card-rating-value">${topEsc(ratingVal)}</span>
+            ${votes?`<span class="anime-card-votes">${topEsc(votes)}</span>`:''}
+          </div>
         </div>
+        <div class="anime-card-title">${topEsc(titleText)}</div>
+        <div class="anime-card-meta">${topEsc(String(item.year||'—'))} • ${topEsc(type)}${item.episodes?' • '+topEsc(item.episodes)+' сер.':''}</div>
       </article>`;
     };
 
