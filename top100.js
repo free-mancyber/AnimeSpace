@@ -22,15 +22,31 @@ async function loadTopCategory(category){
       if(!Array.isArray(data))break;
       pages.push(...data);
       if(data.length<50)break;
-      if(page<2) await new Promise(resolve=>setTimeout(resolve,300));
+      if(page<2)await new Promise(resolve=>setTimeout(resolve,300));
     }
 
     const list=pages.map(normalizeAnime).filter(Boolean).slice(0,100);
-    const make=(a,i)=>`<article class="anime-card top-anime-card" data-anime='${packAnime(a)}'><div class="anime-card-poster"><img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy"><div class="anime-card-rating"><span class="anime-card-rank">#${i}</span><span class="anime-card-star">★</span><span class="anime-card-rating-value">${esc(a.rating||'—')}</span></div></div><div class="anime-card-title">${esc(a.title)}</div><div class="anime-card-meta">${a.year||'—'} • ${esc(a.type||'—')}</div></article>`;
+
+    const make=(a,i)=>{
+      const image=a.image||'';
+      return `<article class="top-card" data-anime='${packAnime(a)}'>
+        <img src="${esc(image)}" alt="${esc(a.title||'Аниме')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+        <div class="top-info">
+          <div class="top-rank">#${i}</div>
+          <div class="top-name">${esc(a.title||'Без названия')}</div>
+          <div class="top-rating">★ ${esc(a.rating||'—')}</div>
+          <div class="top-meta">${a.year||'—'} • ${esc(a.type||'Аниме')}${a.episodes?' • '+esc(String(a.episodes))+' сер.':''}</div>
+        </div>
+      </article>`;
+    };
 
     podium.innerHTML=list.slice(0,3).map((a,i)=>make(a,i+1)).join('');
     grid.innerHTML=list.slice(3).map((a,i)=>make(a,i+4)).join('');
-    if(!list.length)grid.innerHTML='<div class="top-loading">Ничего не найдено</div>';
+
+    if(!list.length){
+      podium.innerHTML='';
+      grid.innerHTML='<div class="top-loading">Ничего не найдено</div>';
+    }
   }catch(e){
     console.error('AnimeSpace top category error:',e);
     podium.innerHTML='';
