@@ -2,7 +2,6 @@
   const originalSearch=window.searchAnimeApi;
   if(typeof originalSearch!=='function')return;
   const API='https://anilibria.top/api/v1/app/search/releases?query=';
-  const TIMEOUT=10000;
   const genreAliases={
     'Экшен':['экшен','action'], 'Приключения':['приключения','adventure'], 'Комедия':['комедия','comedy'],
     'Драма':['драма','drama'], 'Фэнтези':['фэнтези','fantasy'], 'Романтика':['романтика','romance'],
@@ -11,7 +10,6 @@
     'Мистика':['мистика','supernatural'], 'Меха':['меха','mecha'], 'Самураи':['самураи','samurai'], 'Демоны':['демоны','demons'],
     'Магия':['магия','magic'], 'Повседневность':['повседневность','slice of life'], 'Сёнэн':['сёнэн','shounen'], 'Исекай':['исэкай','исекай','isekai']
   };
-  function withTimeout(promise,label){return Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+' timeout')),TIMEOUT))])}
   function normalize(item){
     const r=item?.release||item||{};
     const title=r.name||r.title||item?.name||item?.title||r.names?.ru||r.names?.en||r.names?.romaji||r.alias||item?.alias||'';
@@ -37,15 +35,11 @@
     return true;
   }
   async function fetchSearch(q){
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),TIMEOUT);
-    try{
-      const response=await fetch(API+encodeURIComponent(q),{cache:'no-store',signal:controller.signal});
-      if(!response.ok)throw new Error('AniLibria search API: '+response.status);
-      const json=await response.json();
-      const list=Array.isArray(json)?json:(Array.isArray(json?.data)?json.data:[]);
-      return list.map(normalize).filter(Boolean);
-    }finally{clearTimeout(timer)}
+    const response=await fetch(API+encodeURIComponent(q),{cache:'no-store'});
+    if(!response.ok)throw new Error('AniLibria search API: '+response.status);
+    const json=await response.json();
+    const list=Array.isArray(json)?json:(Array.isArray(json?.data)?json.data:[]);
+    return list.map(normalize).filter(Boolean);
   }
   async function fallback(query,filters={}){
     const q=String(query||'').trim();
@@ -58,7 +52,7 @@
   }
   window.searchAnimeApi=async function(query,filters){
     let result=[];
-    try{result=await withTimeout(originalSearch(query,filters),'AniList search')}catch(e){console.warn('AnimeSpace AniList search failed, using AniLibria fallback:',e)}
+    try{result=await originalSearch(query,filters)}catch(e){console.warn('AnimeSpace AniList search failed, using AniLibria fallback:',e)}
     if(Array.isArray(result)&&result.length)return result;
     if(!String(query||'').trim()&&!Array.isArray(filters?.genres)&&!filters?.year&&!filters?.rating&&!filters?.format)return result||[];
     try{
