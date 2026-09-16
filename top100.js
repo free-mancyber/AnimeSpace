@@ -71,7 +71,7 @@ async function loadTopCategory(category){
           </div>
         </div>
         <div class="anime-card-title">${topEsc(titleText)}</div>
-        <div class="anime-card-meta">${topEsc(String(item.year||'—'))} • ${topEsc(type)}${item.episodes?' • '+topEsc(item.episodes)+' сер.':''}</div>
+        <div class="anime-card-meta">${topEsc(String(item.year||'—'))} • ${topEsc(type)}</div>
       </article>`;
     };
 
