@@ -60,6 +60,80 @@ function safeKodikResult(result) {
   };
 }
 
+function getAllohaTokens() {
+  return [
+    process.env.ALLOHA_TOKEN_1,
+    process.env.ALLOHA_TOKEN_2,
+    process.env.ALLOHA_TOKEN_3
+  ].filter(Boolean);
+}
+
+function normalizeAllohaLink(link) {
+  if (!link || typeof link !== 'string') return null;
+  return link.startsWith('//') ? 'https:' + link : link;
+}
+
+function safeAllohaData(data) {
+  if (!data || typeof data !== 'object') return null;
+  return {
+    id: data.id_kp || null,
+    title: data.name || data.original_name || 'Без названия',
+    poster: normalizeAllohaLink(data.poster),
+    iframe: normalizeAllohaLink(data.iframe),
+    year: data.year || null,
+    quality: data.quality || null,
+    translations: Array.isArray(data.translation) ? data.translation : [],
+    seasons: data.seasons || {}
+  };
+}
+
+async function allohaByKinopoiskId(kpId) {
+  const tokens = getAllohaTokens();
+  if (!tokens.length) {
+    const error = new Error('Alloha tokens are not configured in Vercel');
+    error.status = 503;
+    throw error;
+  }
+
+  let lastError = null;
+  for (const token of tokens) {
+    try {
+      const url = new URL('https://api.alloha.tv/');
+      url.searchParams.set('token', token);
+      url.searchParams.set('kp', String(kpId));
+      const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+      let data = null;
+      try { data = await response.json(); } catch (_) {}
+
+      if (response.status === 429) {
+        const error = new Error('Alloha rate limit reached');
+        error.status = 429;
+        throw error;
+      }
+      if (response.status === 401 || response.status === 403 || response.status >= 500) {
+        lastError = new Error('Alloha token/server request failed');
+        lastError.status = response.status;
+        continue;
+      }
+      if (!response.ok) {
+        const error = new Error(data?.error || 'Alloha API request failed');
+        error.status = response.status;
+        throw error;
+      }
+
+      const result = safeAllohaData(data?.data || data);
+      return { result };
+    } catch (error) {
+      if (error?.status === 429) throw error;
+      lastError = error;
+    }
+  }
+
+  const error = new Error(lastError?.message || 'All configured Alloha tokens failed');
+  error.status = lastError?.status || 502;
+  throw error;
+}
+
 async function kodikSearch(title) {
   const tokens = getKodikTokens();
   if (!tokens.length) {
@@ -152,13 +226,19 @@ function json(res, status, data, cacheSeconds = 60) {
   res.end(JSON.stringify(data));
 }
 
+function extractKinopoiskId(a) {
+  const link = Array.isArray(a?.externalLinks) ? a.externalLinks.find(x => x?.site === 'KINOPOISK') : null;
+  const match = String(link?.url || '').match(/(?:film|series)?\/?(\d{3,})/i);
+  return match ? match[1] : null;
+}
+
 function normalizeAniList(a) {
   if (!a) return null;
   const year = a.seasonYear || (a.startDate?.year ?? null);
   const statusMap = { FINISHED: 'released', RELEASING: 'ongoing', NOT_YET_RELEASED: 'anons', CANCELLED: 'cancelled', HIATUS: 'paused' };
   const formatMap = { TV:'Сериал', MOVIE:'Фильм', OVA:'OVA', ONA:'ONA', SPECIAL:'Спецвыпуск', TV_SHORT:'Сериал', MUSIC:'Музыка' };
   const title = a.title?.english || a.title?.romaji || a.title?.native || 'Без названия';
-  return { id: a.id, title, originalTitle: a.title?.romaji || a.title?.english || a.title?.native || '', image: a.coverImage?.extraLarge || a.coverImage?.large || a.coverImage?.medium || '', rating: a.averageScore ? (a.averageScore / 10).toFixed(1) : '—', year, episodes: a.episodes || 0, status: statusMap[a.status] || String(a.status || '').toLowerCase(), duration: a.duration || 0, type: formatMap[a.format] || a.format || 'Аниме', genres: a.genres || [], description: a.description || '', source: 'anilist' };
+  return { id: a.id, kpId: extractKinopoiskId(a), title, originalTitle: a.title?.romaji || a.title?.english || a.title?.native || '', image: a.coverImage?.extraLarge || a.coverImage?.large || a.coverImage?.medium || '', rating: a.averageScore ? (a.averageScore / 10).toFixed(1) : '—', year, episodes: a.episodes || 0, status: statusMap[a.status] || String(a.status || '').toLowerCase(), duration: a.duration || 0, type: formatMap[a.format] || a.format || 'Аниме', genres: a.genres || [], description: a.description || '', source: 'anilist' };
 }
 
 async function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
@@ -287,9 +367,9 @@ async function anilibriaSchedule() {
   }).filter(x => x.id && x.image && x.title);
 }
 
-const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType,$genre_in:[String],$format:MediaFormat,$from:FuzzyDateInt,$to:FuzzyDateInt,$minScore:Int){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort,genre_in:$genre_in,format:$format,startDate_greater:$from,startDate_lesser:$to,averageScore_greater:$minScore,isAdult:false){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration format genres startDate{year} seasonYear description}}}`;
+const ANILIST_LIST_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$search:String,$type:MediaType,$genre_in:[String],$format:MediaFormat,$from:FuzzyDateInt,$to:FuzzyDateInt,$minScore:Int){Page(page:$page,perPage:$perPage){media(type:$type,search:$search,sort:$sort,genre_in:$genre_in,format:$format,startDate_greater:$from,startDate_lesser:$to,averageScore_greater:$minScore,isAdult:false){id title{romaji english native} coverImage{extraLarge large medium} externalLinks{site url} averageScore episodes status duration format genres startDate{year} seasonYear description}}}`;
 const ANILIST_TOP_QUERY = `query($page:Int,$perPage:Int,$sort:[MediaSort],$season:MediaSeason,$seasonYear:Int,$from:FuzzyDateInt,$to:FuzzyDateInt){Page(page:$page,perPage:$perPage){media(type:ANIME,sort:$sort,season:$season,seasonYear:$seasonYear,startDate_greater:$from,startDate_lesser:$to,isAdult:false){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration format genres startDate{year} seasonYear description}}}`;
-const ANILIST_DETAILS_QUERY = `query($id:Int){Media(id:$id,type:ANIME){id title{romaji english native} coverImage{extraLarge large medium} averageScore episodes status duration format genres startDate{year} seasonYear description}}`;
+const ANILIST_DETAILS_QUERY = `query($id:Int){Media(id:$id,type:ANIME){id title{romaji english native} coverImage{extraLarge large medium} externalLinks{site url} averageScore episodes status duration format genres startDate{year} seasonYear description}}`;
 
 function normalizeGenres(raw) {
   if (raw == null) return [];
@@ -389,6 +469,9 @@ module.exports = async (req, res) => {
       return json(res, 200, normalizeAniList(data.Media), 0);
     }
 
+    if (type === 'alloha' && id) {
+      return json(res, 200, await allohaByKinopoiskId(id), 0);
+    }
     if (type === 'kodik' && q) {
       return json(res, 200, await kodikSearch(q), 0);
     }
