@@ -71,7 +71,7 @@ async function kodikSearch(title) {
   const url = new URL(KODIK_API + '/search');
   url.searchParams.set('title', String(title).trim());
   url.searchParams.set('limit', '20');
-  url.searchParams.set('types', 'anime,anime-serial');
+  url.searchParams.set('types', 'anime-serial,anime-movie');
   url.searchParams.set('with_episodes_data', 'true');
   url.searchParams.set('with_material_data', 'true');
 
@@ -80,7 +80,7 @@ async function kodikSearch(title) {
     try {
       url.searchParams.set('token', token);
       const response = await fetch(url.toString(), {
-        method: 'POST',
+        method: 'GET',
         headers: { Accept: 'application/json' }
       });
       let data = null;
@@ -109,7 +109,7 @@ async function kodikSearch(title) {
       const raw = Array.isArray(data?.results) ? data.results : [];
       const query = String(title).trim();
       const results = raw
-        .filter(item => item?.type === 'anime' || item?.type === 'anime-serial')
+        .filter(item => item?.type === 'anime' || item?.type === 'anime-serial' || item?.type === 'anime-movie')
         .map(item => ({ item, score: kodikTitleScore(query, item) }))
         .filter(x => x.score >= 50)
         .sort((a, b) => b.score - a.score)
