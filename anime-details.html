@@ -77,10 +77,43 @@ function renderKodikPanel(){
   });
 }
 
+async function loadAlloha(){
+  if(!data?.kpId)return false;
+  try{
+    const response=await fetch('https://anime-space-rust.vercel.app/api/anime?type=alloha&id='+encodeURIComponent(data.kpId),{cache:'no-store'});
+    if(!response.ok)return false;
+    const payload=await response.json();
+    const result=payload?.result;
+    if(!result?.iframe)return false;
+
+    const player=document.getElementById('player');
+    const url=safeFrameUrl(result.iframe);
+    if(!url)return false;
+
+    player.innerHTML='<iframe src="'+escapeHtml(url)+'" title="Alloha player" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="width:100%;height:100%;border:0;display:block;background:#050509"></iframe>';
+
+    const panel=document.querySelector('.episode-panel');
+    if(panel){
+      const translations=Array.isArray(result.translations)?result.translations.filter(Boolean):[];
+      panel.innerHTML='<div class="episode-title">Источник</div><div style="color:#777b8d;font-size:13px;line-height:1.5">Alloha'+
+        (translations.length?' · '+translations.map(x=>escapeHtml(typeof x==='string'?x:(x?.value||x?.translation||x?.title||''))).filter(Boolean).join(', '):'')+
+        '</div>';
+    }
+    return true;
+  }catch(error){
+    console.warn('AnimeSpace Alloha error:',error);
+    return false;
+  }
+}
+
 async function loadKodik(){
   if(!data?.title)return;
   const player=document.getElementById('player');
   player.innerHTML='<div class="player-empty">Загрузка источника…</div>';
+
+  const allohaLoaded=await loadAlloha();
+  if(allohaLoaded)return;
+
   try{
     const response=await fetch('https://anime-space-rust.vercel.app/api/anime?type=kodik&q='+encodeURIComponent(data.title),{cache:'no-store'});
     if(!response.ok)throw new Error('Kodik API: '+response.status);
@@ -88,13 +121,12 @@ async function loadKodik(){
     renderKodikPanel();
     renderKodikPlayer();
   }catch(error){
-    console.error('AnimeSpace Kodik error:',error);
+    console.error('AnimeSpace player error:',error);
     player.innerHTML='<div class="player-empty">Не удалось загрузить источник</div>';
     const panel=document.querySelector('.episode-panel');
-    if(panel)panel.innerHTML='<div class="episode-title">Озвучка</div><div style="color:#777b8d;font-size:13px;line-height:1.5">Ошибка загрузки источника</div>';
+    if(panel)panel.innerHTML='<div class="episode-title">Источник</div><div style="color:#777b8d;font-size:13px;line-height:1.5">Источник не найден</div>';
   }
 }
-
 async function init(){
   if(!data)return;
   document.getElementById('title').textContent=data.title||'Название аниме';
