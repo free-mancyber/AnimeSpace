@@ -78,9 +78,21 @@ function renderKodikPanel(){
 }
 
 async function loadAlloha(){
-  if(!data?.kpId)return false;
   try{
-    const response=await fetch('https://anime-space-rust.vercel.app/api/anime?type=alloha&id='+encodeURIComponent(data.kpId),{cache:'no-store'});
+    let kpId=data?.kpId||null;
+
+    if(!kpId && data?.id){
+      const detailsResponse=await fetch('https://anime-space-rust.vercel.app/api/anime?type=details&id='+encodeURIComponent(data.id),{cache:'no-store'});
+      if(detailsResponse.ok){
+        const details=await detailsResponse.json();
+        kpId=details?.kpId||null;
+        if(kpId)data.kpId=kpId;
+      }
+    }
+
+    if(!kpId)return false;
+
+    const response=await fetch('https://anime-space-rust.vercel.app/api/anime?type=alloha&id='+encodeURIComponent(kpId),{cache:'no-store'});
     if(!response.ok)return false;
     const payload=await response.json();
     const result=payload?.result;
