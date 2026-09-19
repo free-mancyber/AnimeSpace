@@ -82,7 +82,7 @@ async function loadKodik(){
   const player=document.getElementById('player');
   player.innerHTML='<div class="player-empty">Загрузка источника…</div>';
   try{
-    const response=await fetch('/api/anime?type=kodik&q='+encodeURIComponent(data.title),{cache:'no-store'});
+    const response=await fetch('https://anime-space-rust.vercel.app/api/anime?type=kodik&q='+encodeURIComponent(data.title),{cache:'no-store'});
     if(!response.ok)throw new Error('Kodik API: '+response.status);
     kodikData=await response.json();
     renderKodikPanel();
