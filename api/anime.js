@@ -267,6 +267,25 @@ function normalizeGenres(raw) {
   }).filter(Boolean);
 }
 
+async function resolveKinopoiskIdByTitle(title) {
+  const query = String(title || '').trim();
+  if (!query) return null;
+
+  const data = await anilist(
+    `query($search:String){Page(page:1,perPage:5){media(type:ANIME,search:$search,isAdult:false){id title{romaji english native} externalLinks{site url}}}}`,
+    { search: query }
+  );
+
+  const media = Array.isArray(data?.Page?.media) ? data.Page.media : [];
+
+  for (const item of media) {
+    const kpId = extractKinopoiskId(item);
+    if (kpId) return kpId;
+  }
+
+  return null;
+}
+
 async function anilistList({ page = 1, limit = 20, order = 'ranked', search, category = 'overall', genres = [], year, rating, type } = {}) {
   let sort = ['SCORE_DESC'];
   if (order === 'popularity') sort = ['POPULARITY_DESC'];
@@ -354,6 +373,10 @@ module.exports = async (req, res) => {
       return json(res, 200, normalizeAniList(data.Media), 0);
     }
 
+    if (type === 'resolve-kp' && q) {
+      const kpId = await resolveKinopoiskIdByTitle(q);
+      return json(res, 200, { kpId }, 0);
+    }
     if (type === 'alloha' && id) {
       return json(res, 200, await allohaByKinopoiskId(id), 0);
     }
