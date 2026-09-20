@@ -344,9 +344,6 @@ module.exports = async (req, res) => {
     if (type === 'alloha' && id) {
       return json(res, 200, await allohaByKinopoiskId(id), 0);
     }
-    if (type === 'kodik' && q) {
-      return json(res, 200, await kodikSearch(q), 0);
-    }
     if (type === 'schedule') return json(res, 200, await anilibriaSchedule(), 0);
     return json(res, 400, { error: 'Invalid request' }, 0);
   } catch (error) {
