@@ -1,94 +1,25 @@
 const ANILIST_API = 'https://graphql.anilist.co';
-const KODIK_API = 'https://kodik-api.com';
-
-function getKodikTokens() {
-  return [
-    process.env.KODIK_TOKEN_1,
-    process.env.KODIK_TOKEN_2,
-    process.env.KODIK_TOKEN_3,
-    process.env.KODIK_TOKEN_4,
-    process.env.KODIK_TOKEN_5
-  ].filter(Boolean);
-}
-
-function normalizeKodikLink(link) {
-  if (!link || typeof link !== 'string') return null;
-  return link.startsWith('//') ? 'https:' + link : link;
-}
-
-function kodikTitleScore(query, result) {
-  const q = String(query || '').trim().toLowerCase();
-  const values = [result?.title, result?.title_orig, result?.other_title].filter(Boolean).map(x => String(x).toLowerCase());
-  if (!q || !values.length) return 0;
-  if (values.some(v => v === q)) return 100;
-  if (values.some(v => v.includes(q) || q.includes(v))) return 80;
-  const words = q.split(/\\s+/).filter(Boolean);
-  return words.length ? Math.round(words.filter(w => values.some(v => v.includes(w))).length / words.length * 50) : 0;
-}
-
-function safeKodikResult(result) {
-  const rating = result?.material_data?.rating_mpaa;
-  if (rating === 'r' || rating === 'rx') return null;
-  const seasons = result?.seasons || {};
-  const episodes = {};
-  for (const [seasonNumber, season] of Object.entries(seasons)) {
-    for (const [episodeNumber, episode] of Object.entries(season?.episodes || {})) {
-      if (episode?.link) {
-        episodes[seasonNumber + ':' + episodeNumber] = {
-          season: Number(seasonNumber) || 1,
-          episode: Number(episodeNumber) || 1,
-          title: episode.title || '',
-          link: normalizeKodikLink(episode.link),
-          screenshots: Array.isArray(episode.screenshots) ? episode.screenshots : []
-        };
-      }
-    }
-  }
-  return {
-    id: result?.id || null,
-    title: result?.title || result?.title_orig || 'Без названия',
-    translationId: result?.translation?.id ?? null,
-    translation: result?.translation?.title || 'Озвучка',
-    translationType: result?.translation?.type || 'voice',
-    year: result?.year || null,
-    type: result?.type || null,
-    episodesCount: result?.episodes_count || 0,
-    lastEpisode: result?.last_episode || null,
-    link: normalizeKodikLink(result?.link),
-    episodes,
-    ratingMpaa: rating || null
-  };
-}
 
 function getAllohaTokens() {
-  return [
-    process.env.ALLOHA_TOKEN_1,
-    process.env.ALLOHA_TOKEN_2,
-    process.env.ALLOHA_TOKEN_3
-  ].filter(Boolean);
-}
+  const raw = process.env.ALLOHA_TOKENS;
+  if (!raw) return [];
 
-function normalizeAllohaLink(link) {
-  if (!link || typeof link !== 'string') return null;
-  return link.startsWith('//') ? 'https:' + link : link;
-}
+  let values = [];
+  try {
+    const parsed = JSON.parse(raw);
+    values = Array.isArray(parsed) ? parsed : [parsed];
+  } catch (_) {
+    values = String(raw).split(/[\\s,;]+/);
+  }
 
-function safeAllohaData(data) {
-  if (!data || typeof data !== 'object') return null;
-  return {
-    id: data.id_kp || null,
-    title: data.name || data.original_name || 'Без названия',
-    poster: normalizeAllohaLink(data.poster),
-    iframe: normalizeAllohaLink(data.iframe),
-    year: data.year || null,
-    quality: data.quality || null,
-    translations: Array.isArray(data.translation) ? data.translation : [],
-    seasons: data.seasons || {}
-  };
+  return values
+    .map(token => String(token || '').trim())
+    .filter(Boolean);
 }
 
 async function allohaByKinopoiskId(kpId) {
   const tokens = getAllohaTokens();
+
   if (!tokens.length) {
     const error = new Error('Alloha tokens are not configured in Vercel');
     error.status = 503;
@@ -96,33 +27,42 @@ async function allohaByKinopoiskId(kpId) {
   }
 
   let lastError = null;
+
   for (const token of tokens) {
     try {
       const url = new URL('https://api.alloha.tv/');
       url.searchParams.set('token', token);
       url.searchParams.set('kp', String(kpId));
-      const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-      let data = null;
-      try { data = await response.json(); } catch (_) {}
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Accept: 'application/json' }
+      });
+
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (_) {}
+
+      if (response.status === 401 || response.status === 403 || response.status >= 500) {
+        lastError = new Error('Alloha token/server request failed');
+        lastError.status = response.status;
+        continue;
+      }
 
       if (response.status === 429) {
         const error = new Error('Alloha rate limit reached');
         error.status = 429;
         throw error;
       }
-      if (response.status === 401 || response.status === 403 || response.status >= 500) {
-        lastError = new Error('Alloha token/server request failed');
-        lastError.status = response.status;
-        continue;
-      }
+
       if (!response.ok) {
-        const error = new Error(data?.error || 'Alloha API request failed');
+        const error = new Error(payload?.error || 'Alloha API request failed');
         error.status = response.status;
         throw error;
       }
 
-      const result = safeAllohaData(data?.data || data);
-      return { result };
+      return payload;
     } catch (error) {
       if (error?.status === 429) throw error;
       lastError = error;
@@ -130,74 +70,6 @@ async function allohaByKinopoiskId(kpId) {
   }
 
   const error = new Error(lastError?.message || 'All configured Alloha tokens failed');
-  error.status = lastError?.status || 502;
-  throw error;
-}
-
-async function kodikSearch(title) {
-  const tokens = getKodikTokens();
-  if (!tokens.length) {
-    const error = new Error('Kodik tokens are not configured in Vercel');
-    error.status = 503;
-    throw error;
-  }
-
-  const url = new URL(KODIK_API + '/search');
-  url.searchParams.set('title', String(title).trim());
-  url.searchParams.set('limit', '20');
-  url.searchParams.set('types', 'anime-serial,anime-movie');
-  url.searchParams.set('with_episodes_data', 'true');
-  url.searchParams.set('with_material_data', 'true');
-
-  let lastError = null;
-  for (const token of tokens) {
-    try {
-      url.searchParams.set('token', token);
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: { Accept: 'application/json' }
-      });
-      let data = null;
-      try { data = await response.json(); } catch (_) {}
-
-      // Do not rotate tokens on rate limits: that would turn token failover
-      // into a way to bypass a provider's rate limit.
-      if (response.status === 429) {
-        const error = new Error('Kodik rate limit reached');
-        error.status = 429;
-        throw error;
-      }
-
-      if (response.status === 401 || response.status === 403 || response.status >= 500) {
-        lastError = new Error('Kodik token/server request failed');
-        lastError.status = response.status;
-        continue;
-      }
-
-      if (!response.ok) {
-        const error = new Error(data?.error || 'Kodik API request failed');
-        error.status = response.status;
-        throw error;
-      }
-
-      const raw = Array.isArray(data?.results) ? data.results : [];
-      const query = String(title).trim();
-      const results = raw
-        .filter(item => item?.type === 'anime' || item?.type === 'anime-serial' || item?.type === 'anime-movie')
-        .map(item => ({ item, score: kodikTitleScore(query, item) }))
-        .filter(x => x.score >= 50)
-        .sort((a, b) => b.score - a.score)
-        .map(x => safeKodikResult(x.item))
-        .filter(Boolean);
-
-      return { results };
-    } catch (error) {
-      if (error?.status === 429) throw error;
-      lastError = error;
-    }
-  }
-
-  const error = new Error(lastError?.message || 'All configured Kodik tokens failed');
   error.status = lastError?.status || 502;
   throw error;
 }
