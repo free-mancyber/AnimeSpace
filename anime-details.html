@@ -35,6 +35,18 @@ async function loadAlloha(){
       }
     }
 
+    if(!kpId && data?.title){
+      const resolveResponse=await fetch(
+        'https://anime-space-rust.vercel.app/api/anime?type=resolve-kp&q='+encodeURIComponent(data.title),
+        {cache:'no-store'}
+      );
+      if(resolveResponse.ok){
+        const resolved=await resolveResponse.json();
+        kpId=resolved?.kpId||null;
+        if(kpId)data.kpId=kpId;
+      }
+    }
+
     if(!kpId){
       player.innerHTML='<div class="player-empty">Kinopoisk ID для Alloha не найден</div>';
       return false;
