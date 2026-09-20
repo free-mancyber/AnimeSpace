@@ -1,20 +1,33 @@
 const ANILIST_API = 'https://graphql.anilist.co';
 
 function getAllohaTokens() {
-  const raw = process.env.ALLOHA_TOKENS;
-  if (!raw) return [];
+  const values = [];
 
-  let values = [];
-  try {
-    const parsed = JSON.parse(raw);
-    values = Array.isArray(parsed) ? parsed : [parsed];
-  } catch (_) {
-    values = String(raw).split(/[\\s,;]+/);
+  // Supports both a single ALLOHA_TOKENS variable and
+  // the currently configured ALLOHA_TOKEN_1..3 variables.
+  const raw = process.env.ALLOHA_TOKENS;
+
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) values.push(...parsed);
+      else values.push(parsed);
+    } catch (_) {
+      values.push(...String(raw).split(/[\\s,;]+/));
+    }
   }
 
-  return values
-    .map(token => String(token || '').trim())
-    .filter(Boolean);
+  values.push(
+    process.env.ALLOHA_TOKEN_1,
+    process.env.ALLOHA_TOKEN_2,
+    process.env.ALLOHA_TOKEN_3,
+    process.env.ALLOHA_TOKEN_4,
+    process.env.ALLOHA_TOKEN_5
+  );
+
+  return [...new Set(
+    values.map(token => String(token || '').trim()).filter(Boolean)
+  )];
 }
 
 async function allohaByKinopoiskId(kpId) {
