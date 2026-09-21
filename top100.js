@@ -48,9 +48,7 @@ async function loadTopCategory(category){
 
     const makeCard=(item,rank)=>{
       const imageUrl=topImage(item);
-      const titleText=typeof item.title==='string'
-        ?item.title
-        :(item.title?.userPreferred||item.title?.romaji||item.title?.english||item.title?.native||'Без названия');
+      const titleText=russianTitle(item);
       const ratingVal=item.rating||'—';
       const votes=item.votes?String(item.votes):'';
       const type=item.type||'Аниме';
