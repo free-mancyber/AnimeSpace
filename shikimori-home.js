@@ -8,6 +8,7 @@ function normalizeShikimoriAnime(a){
   return {
     id:a.id,
     shikimoriId:a.id,
+    malId:a.id,
     title:a.russian||a.name||'Без названия',
     originalTitle:a.name||'',
     image:image.startsWith('http')?image:'https://shikimori.one'+image,
