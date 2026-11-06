@@ -22,8 +22,10 @@ async function loadTopCategory(category){
   const podium=document.getElementById('podium');
   if(!grid||!podium)return;
 
-  grid.innerHTML='<div class="top-loading">Загрузка...</div>';
-  podium.innerHTML='';
+  const token=(loadTopCategory.token=(loadTopCategory.token||0)+1);
+  const sk='<div class="anime-card skeleton" aria-hidden="true"><div class="anime-card-poster"></div><div class="sk-line"></div><div class="sk-line short"></div></div>';
+  podium.innerHTML=sk.repeat(3);
+  grid.innerHTML=sk.repeat(12);
 
   try{
     const items=[];
@@ -44,6 +46,8 @@ async function loadTopCategory(category){
       if(data.length<50)break;
     }
 
+    // Пользователь успел переключить вкладку — не перетираем новый результат старым
+    if(token!==loadTopCategory.token)return;
     const list=items.slice(0,100).filter(item=>item&&typeof item==='object');
 
     const makeCard=(item,rank)=>{
@@ -58,7 +62,7 @@ async function loadTopCategory(category){
         ?`this.onerror=null;this.src='${topEsc(fallback)}'`
         :`this.onerror=null;this.style.visibility='hidden'`;
 
-      return `<article class="anime-card top-card" data-anime="${packed}">
+      return `<article class="anime-card top-card" tabindex="0" role="link" aria-label="${topEsc(titleText)}" data-anime="${packed}">
         <div class="anime-card-poster">
           <img src="${topEsc(imageUrl)}" alt="${topEsc(titleText)}" loading="lazy" referrerpolicy="no-referrer" onerror="${onError}">
           <div class="anime-card-rating">
@@ -81,6 +85,7 @@ async function loadTopCategory(category){
       grid.innerHTML='<div class="top-loading">Ничего не найдено</div>';
     }
   }catch(error){
+    if(token!==loadTopCategory.token)return;
     console.error('AnimeSpace Top 100 error:',error);
     podium.innerHTML='';
     grid.innerHTML='<div class="top-loading">Не удалось загрузить топ</div>';
